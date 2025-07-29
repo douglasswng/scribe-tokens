@@ -10,6 +10,7 @@ ARTIFACTS_DIR = BASE_DIR / "artifacts"
 
 RAW_DIR = DATA_DIR / "raw"
 PARSED_DIR = DATA_DIR / "parsed"
+BLACKLIST_PATH = PARSED_DIR / "blacklist.txt"  # some bad datapoints
 
 RAW_IAM_DIR = RAW_DIR / "iam"
 PARSED_IAM_DIR = PARSED_DIR / "iam"
@@ -34,34 +35,25 @@ NUM_CHARS = len(CHARS)  # 79
 VOCAB_SIZE = 25000
 DELTA = 2
 MAX_LEN = int(1e5)
-SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA
+SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
 # Model hyperparameters
-HIDDEN_DIM = 256
+HIDDEN_DIM = 512
 FFN_FACTOR = 4
-NUM_LSTM_LAYERS = 2
-NUM_ENCODER_LAYERS = 6
-NUM_DECODER_LAYERS = 6
-NUM_HEADS = 4
+NUM_LAYERS = 8
+NUM_HEADS = 8
 DROPOUT = 0.1
-NUM_MIXTURES = 20
 
 # Training hyperparameters
-UNKNOWN_TOKEN_RATE = 0.002  # match the unknown rate on the validation set
 BATCH_SIZE = 64
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
-VECTOR_LOSS_FACTOR = 0.1  # multiply vector loss by this factor to balance with token loss
-NUM_EPOCHS = 100
+NUM_EPOCHS = 1000
 PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs
 WEIGHT_DECAY = 1e-2
 
 # Augmenter hyperparameters
 SCALE_RANGE = 0.2  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
-SHEAR_FACTOR = 0.2  # shear factor between (-SHEAR_FACTOR, SHEAR_FACTOR)
-ROTATE_ANGLE = 10  # rotate angle (degrees) between (-ROTATE_ANGLE, ROTATE_ANGLE)
-
-# BERT-style pretraining hyperparameters
-MASK_PROB = 0.15
-MASK_TOKEN_RATE = 0.8
-RANDOM_TOKEN_RATE = 0.1
-SAME_TOKEN_RATE = 0.1
+SHEAR_FACTOR = 0.5  # shear factor between (-SHEAR_FACTOR, SHEAR_FACTOR)
+ROTATE_ANGLE = 5  # rotate angle (degrees) between (-ROTATE_ANGLE, ROTATE_ANGLE)
+JITTER_SIGMA = 5  # the std of gaussian noise added to the points
+AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, independently

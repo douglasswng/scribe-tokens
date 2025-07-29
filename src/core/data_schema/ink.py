@@ -57,6 +57,11 @@ class Point[T: (float, int)](BaseModel):
     
     def round(self) -> 'Point[int]':
         return Point(x=round(self.x), y=round(self.y))
+    
+    def jitter(self, sigma: float) -> 'Point':
+        jitter_x = np.random.normal(0, sigma)
+        jitter_y = np.random.normal(0, sigma)
+        return Point(x=self.x + jitter_x, y=self.y + jitter_y)
 
 
 class Stroke[T: (float, int)](BaseModel):
@@ -106,7 +111,7 @@ class Stroke[T: (float, int)](BaseModel):
         
         return Stroke(points=downsampled)
 
-    def smooth(self, window_length: int=5, polyorder: int=3) -> 'Stroke':
+    def smooth(self, window_length: int, polyorder: int) -> 'Stroke':
         if len(self.points) < window_length:
             return Stroke(points=self.points[:])
         
@@ -119,6 +124,9 @@ class Stroke[T: (float, int)](BaseModel):
         
         smoothed_points = [Point(x=float(x), y=float(y)) for x, y in zip(smoothed_x, smoothed_y)]
         return Stroke(points=smoothed_points)
+    
+    def jitter(self, sigma: float) -> 'Stroke':
+        return Stroke(points=[point.jitter(sigma) for point in self.points])
 
 
 class DigitalInk[T: (float, int)](BaseModel):
@@ -214,8 +222,11 @@ class DigitalInk[T: (float, int)](BaseModel):
     def downsample(self, factor: int) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.downsample(factor) for stroke in self.strokes])
 
-    def smooth(self, window_length: int=5, polyorder: int=3) -> 'DigitalInk':
+    def smooth(self, window_length: int, polyorder: int) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.smooth(window_length, polyorder) for stroke in self.strokes])
+    
+    def jitter(self, sigma: float) -> 'DigitalInk':
+        return DigitalInk(strokes=[stroke.jitter(sigma) for stroke in self.strokes])
     
     def visualise(self, connect: bool=True, name: str | None = None) -> None:
         fig, ax = plt.subplots(figsize=(12, 8))

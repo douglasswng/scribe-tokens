@@ -107,10 +107,9 @@ class Stroke[T: (float, int)](BaseModel):
         return Stroke(points=downsampled)
 
     def smooth(self, window_length: int=5, polyorder: int=3) -> 'Stroke':
-        if len(self.points) < 5:  # Savgol filter needs at least 5 points for window_length=5
-            return Stroke(points=self.points[:])  # Return copy of original stroke
+        if len(self.points) < window_length:
+            return Stroke(points=self.points[:])
         
-        # Extract x and y coordinates
         x_coords = np.array([point.x for point in self.points])
         y_coords = np.array([point.y for point in self.points])
         
@@ -118,9 +117,7 @@ class Stroke[T: (float, int)](BaseModel):
         smoothed_x = savgol_filter(x_coords, window_length, polyorder)
         smoothed_y = savgol_filter(y_coords, window_length, polyorder)
         
-        # Create new points with smoothed coordinates
         smoothed_points = [Point(x=float(x), y=float(y)) for x, y in zip(smoothed_x, smoothed_y)]
-        
         return Stroke(points=smoothed_points)
 
 

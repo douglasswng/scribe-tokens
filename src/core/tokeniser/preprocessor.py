@@ -22,7 +22,7 @@ class DeltaPreprocessor(Preprocessor):
 class DeltaSmoothPreprocessor(Preprocessor):
     def __init__(self, delta: int | float,
                  downsample_factor: int,
-                 smooth_window_length: int=5,
+                 smooth_window_length: int=7,
                  smooth_polyorder: int=3):
         self._delta = delta
         self._downsample_factor = downsample_factor

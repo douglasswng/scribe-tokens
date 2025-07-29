@@ -52,7 +52,7 @@ def create_dataloaders(model_id: ModelId,
                        pin_memory: bool = True,
                        persistent_workers: bool = True  # seems to speed up
                        ) -> tuple[DataLoader, DataLoader, DataLoader]:
-    datasplit = create_datasplit(model_id)
+    datasplit = create_datasplit()
     device_batch_size = distributed_context.divide_by_world_size(batch_size)
     device_num_workers = distributed_context.divide_by_world_size(num_workers)
     persistent_workers = persistent_workers and device_num_workers > 0
@@ -73,7 +73,6 @@ if __name__ == "__main__":
     import time
 
     num_workers_list = [0, 4, 16, 64, 256, 1024]
-    num_workers_list = [16]
     for model_id in ModelId.create_defaults()[:]:
         if distributed_context.is_master:
             print(f"Model: {model_id}")
@@ -88,9 +87,6 @@ if __name__ == "__main__":
                 for batch in train_loader:
                     batch: Batch
                     main, ref = batch.main_batch, batch.reference_batch
-                    # if ref is not None:
-                    #     main.instances[0].parsed.visualise()
-                    #     ref.instances[0].parsed.visualise()
                     pass  # Simulate training step
                 elapsed = time.time() - start
                 if distributed_context.is_master:

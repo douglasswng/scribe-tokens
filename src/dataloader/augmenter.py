@@ -6,15 +6,12 @@ from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA
 
 class AugmenterConfig:
     def __init__(self):
-        self.scale_factor = 1 + self._sample_arg(1 - SCALE_RANGE, 1 + SCALE_RANGE)
+        self.scale_factor = 1 + self._sample_arg(-SCALE_RANGE, SCALE_RANGE)
         self.shear_factor = self._sample_arg(-SHEAR_FACTOR, SHEAR_FACTOR)
         self.rotate_angle = self._sample_arg(-ROTATE_ANGLE, ROTATE_ANGLE)
         self.jitter_sigma = self._sample_arg(0, JITTER_SIGMA)
 
-        self.jitter_sigma = JITTER_SIGMA
-
     def _sample_arg(self, min_val: float, max_val: float, default: float=0) -> float:
-        return random.uniform(min_val, max_val)  # debug
         if random.random() <= AUGMENT_PROB:
             return random.uniform(min_val, max_val)
         return default
@@ -25,10 +22,11 @@ class Augmenter:
 
     @classmethod
     def _augment_ink(cls, ink: DigitalInk, config: AugmenterConfig) -> DigitalInk:
-        # ink = ink.scale(config.scale_factor)
-        # ink = ink.shear(config.shear_factor)
-        # ink = ink.rotate(config.rotate_angle)
+        ink = ink.scale(config.scale_factor)
+        ink = ink.shear(config.shear_factor)
+        ink = ink.rotate(config.rotate_angle)
         ink = ink.jitter(config.jitter_sigma)
+        ink = ink.to_origin()
         return ink
 
     @classmethod

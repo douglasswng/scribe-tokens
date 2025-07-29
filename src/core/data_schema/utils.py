@@ -25,16 +25,13 @@ class IdMapper:
         return [cls._ID_CHAR_MAP[id] for id in ids]
     
     @classmethod
-    def str_to_ids(cls, s: str, add_bos: bool=False, add_eos: bool=False) -> list[int]:
+    def str_to_ids(cls, s: str) -> list[int]:
         max_id = max(cls._CHAR_ID_MAP.values())
         bos_id = max_id + 1
         eos_id = max_id + 2
         
         ids = cls.chars_to_ids(list(s))
-        if add_bos:
-            ids = [bos_id] + ids
-        if add_eos:
-            ids = ids + [eos_id]
+        ids = [bos_id] + ids + [eos_id]
         return ids
     
     @classmethod

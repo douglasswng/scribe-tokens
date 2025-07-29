@@ -7,7 +7,6 @@ import torch
 from torch.utils.data import Dataset
 
 from core.data_schema import Parsed, IdMapper, Instance
-from core.repr import ReprId
 from core.model import ModelId
 from repr.factory import DefaultReprFactory
 from dataloader.augmenter import Augmenter
@@ -49,8 +48,7 @@ class ParsedDataset(Dataset):
     def _to_instance(self, parsed: Parsed) -> Instance:
         repr_tensor = DefaultReprFactory.ink_to_tensor(self._model_id.repr_id, parsed.ink)
         writer_id = IdMapper.writer_to_id(parsed.writer)
-        add_char_bos_eos = self._model_id.is_generation
-        char_ids = IdMapper.str_to_ids(parsed.text, add_char_bos_eos, add_char_bos_eos)
+        char_ids = IdMapper.str_to_ids(parsed.text)
         return Instance(parsed=parsed,
                         repr_tensor=repr_tensor,
                         writer_id_tensor=torch.tensor([writer_id]),
@@ -101,14 +99,13 @@ if __name__ == "__main__":
     for _ in range(2):
         for model_id in ModelId.create_defaults():
             print(model_id)
-            train_dataset, val_dataset, test_dataset = create_datasets(model_id, create_datasplit(model_id))
+            train_dataset, val_dataset, test_dataset = create_datasets(model_id, create_datasplit())
             for _ in range(5):
                 start = time()
                 main_instance, reference_instance = train_dataset[0]
                 if reference_instance is not None:
                     main_instance.parsed.visualise()
                     reference_instance.parsed.visualise()
-                #train_dataset[0][0].repr_tensor.shape
                 end = time()
                 print(f"Time taken: {end - start} seconds")
             print()

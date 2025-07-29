@@ -1,0 +1,57 @@
+from core.data_schema import DigitalInk, Point, Stroke
+from core.tokeniser import RegularToken, RegularTokenType, Token, DiscreteTokeniser, Coord
+    
+
+class AbsTokeniser(DiscreteTokeniser):
+    def _create_abs_token(self, x: int, y: int) -> RegularToken:
+        return RegularToken(type=RegularTokenType.ABS,
+                            values=[Coord(x=x, y=y)])
+    
+    def _create_point(self, token: RegularToken) -> Point:
+        coord = token.values[0]
+        assert isinstance(coord, Coord)
+        return Point(x=coord.x, y=coord.y)
+
+    def tokenise(self, digital_ink: DigitalInk[int]) -> list[Token]:
+        tokens: list[Token] = [self.start_token]
+        for stroke in digital_ink.strokes:
+            for point in stroke.points:
+                tokens.append(self._create_abs_token(point.x, point.y))
+            tokens.append(self.up_token)
+        tokens.append(self.end_token)
+        return tokens
+
+    def detokenise(self, tokens: list[Token]) -> DigitalInk[int]:
+        stroke: Stroke[int] = Stroke(points=[])
+        strokes: list[Stroke[int]] = []
+        for token in tokens:
+            match token:
+                case self.start_token:
+                    continue
+                case self.unknown_token:
+                    continue
+                case self.end_token:
+                    return DigitalInk(strokes=strokes)
+                case self.up_token:
+                    strokes.append(stroke)
+                    stroke = Stroke(points=[])
+                case RegularToken():
+                    point = self._create_point(token)
+                    stroke.points.append(point)
+                case _:
+                    raise ValueError(f"Unknown token: {token}")
+        return DigitalInk(strokes=strokes)
+            
+
+if __name__ == "__main__":
+    from core.data_schema import Parsed
+    parsed = Parsed.load_random()
+    digital_ink = parsed.ink
+    digital_ink.visualise()
+
+    tokeniser = AbsTokeniser()
+    tokens = tokeniser.tokenise(digital_ink)
+    print('\n'.join([str(token) for token in tokens]))
+    
+    detokenised = tokeniser.detokenise(tokens)
+    detokenised.visualise()

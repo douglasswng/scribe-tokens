@@ -1,0 +1,12 @@
+.DS_Store
+/archive/
+/artifacts/*
+/data/
+/tmp/
+__pycache__
+*.ipynb
+.env
+del*
+*.pdf
+
+!/artifacts/tokenisers/

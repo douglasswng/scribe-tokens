@@ -60,4 +60,9 @@ class PairBatch:
         return self.get_sample(random_idx)
     
 
-type Batch = PairBatch
+@dataclass(frozen=True)
+class SingletonBatch:
+    datapoints: list[Instance]
+
+
+type Batch = PairBatch | SingletonBatch

@@ -1,120 +1,92 @@
+from functools import partial
+
 import torch
 from torch import Tensor
+import torch.nn as nn
 
 from core.model import LocalModel, ModelId
-from core.data_schema import Batch, DigitalInk
+from core.data_schema import Batch, DigitalInk, PairBatch, InstancePair
 from repr.factory import DefaultReprFactory
 from model.modules.embedder import Embedder, CharEmbedder, TokenEmbedder
-from model.modules.encoder import Encoder
-from model.modules.decoder import Decoder
-from model.models.gen_mixin import GenMixin, MDNParam
+from model.modules.decoder import TransformerDecoder
 
 
-class GenerationModel(LocalModel, GenMixin):
+class GenerationModel(LocalModel):
     def __init__(self, model_id: ModelId):
         super().__init__()
         self._model_id = model_id
 
         self._repr_embedder: Embedder = TokenEmbedder()
         self._char_embedder: Embedder = CharEmbedder()
-        self._repr_decoder = Decoder()
+        self._decoder = TransformerDecoder()
 
-    def _forward(self, ref_repr: Tensor,
-                 main_char: Tensor,
-                 main_repr_input: Tensor,
-                 ref_repr_pad: Tensor | None = None,
-                 main_char_pad: Tensor | None = None,
-                 main_repr_input_pad: Tensor | None = None
-                 ) -> Tensor | MDNParam:
-        ref_repr = self._repr_embedder.embed(ref_repr)
-        main_char = self._char_embedder.embed(main_char)
-        main_repr_input = self._repr_embedder.embed(main_repr_input)
+    def _forward(self, input: torch.Tensor) -> Tensor:
+        output = self._decoder(input)
+        logits = self._repr_embedder.unembed(output)
+        return logits
+    
+    def _ce_loss(self,
+                 pred: Tensor,
+                 target: Tensor,
+                 padding: Tensor) -> Tensor:
+        logits_flat = pred.reshape(-1, pred.size(-1))
+        target_flat = target.reshape(-1)
+        padding_flat = padding.reshape(-1)
         
-        ref_repr = self._ref_repr_encoder.forward(x=ref_repr, pad=ref_repr_pad)
-        main_char = self._main_char_decoder.forward(tgt=main_char,
-                                                    memory=ref_repr,
-                                                    tgt_pad=main_char_pad,
-                                                    memory_pad=ref_repr_pad)
-        main_repr_input = self._main_repr_decoder.forward(tgt=main_repr_input,
-                                                          memory=main_char,
-                                                          tgt_pad=main_repr_input_pad,
-                                                          memory_pad=main_char_pad)
-
-        main_repr_pred = self._repr_embedder.unembed(main_repr_input)
-        return main_repr_pred
+        criterion = nn.CrossEntropyLoss(reduction='none')
+        loss = criterion(logits_flat, target_flat)
+        masked_loss = loss * padding_flat
+        return masked_loss.sum() / padding_flat.sum()
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
-        if batch.reference_batch is None:
-            raise ValueError("Reference batch is required for generation model")
-        
-        main_batch, ref_batch = batch.main_batch, batch.reference_batch
-        main_repr_pred = self._forward(ref_repr=ref_batch.repr, 
-                                       main_char=main_batch.char, 
-                                       main_repr_input=main_batch.repr_input, 
-                                       ref_repr_pad=ref_batch.repr_pad,
-                                       main_char_pad=main_batch.char_pad,
-                                       main_repr_input_pad=main_batch.repr_input_pad)
-
-        loss = self._loss(main_repr_pred, main_batch.repr_target, main_batch.repr_target_pad)
-        loss_name = 'ntp_ce' if self._is_token_repr(main_batch.repr_target) else 'ntp_nll'
-        return {loss_name: loss}
+        assert isinstance(batch, PairBatch)
+        main_repr_pred = self._forward(batch.input)
+        loss = self._ce_loss(main_repr_pred, batch.target, batch.padding)
+        return {'ntp_ce': loss}
     
-    def _get_last_pred(self, main_repr_pred: Tensor | MDNParam) -> Tensor | MDNParam:
-        if self._is_token_pred(main_repr_pred):
-            return main_repr_pred[:, -1]
-        elif self._is_vector_pred(main_repr_pred):
-            last_pred = tuple(tensor[:, -1] for tensor in main_repr_pred)
-            assert len(last_pred) == 5
-            return last_pred
-        else:
-            raise ValueError(f"Unsupported prediction {main_repr_pred}")
+    def _generate_next_token(self, input: Tensor, temperature: float = 1.0) -> Tensor:
+        gen_repr_pred = self._forward(input=input)
+        last_pred = gen_repr_pred[:, -1]
+        token_probs = torch.softmax(last_pred / temperature, dim=-1)
+        token_indices = torch.multinomial(token_probs, 1)  # Keep shape [batch_size, 1]
+        return token_indices
     
-    def _generate_next_tensor(self, ref_repr: Tensor,
-                              main_char: Tensor,
-                              gen_repr: Tensor,
-                              ref_repr_pad: Tensor,
-                              main_char_pad: Tensor) -> Tensor:
-        gen_repr_pred = self._forward(ref_repr=ref_repr,
-                                      main_char=main_char,
-                                      main_repr_input=gen_repr,
-                                      ref_repr_pad=ref_repr_pad,
-                                      main_char_pad=main_char_pad)
-        last_pred = self._get_last_pred(gen_repr_pred)
-        next_tensor = self._sample_next_tensor(last_pred)
-        return next_tensor
+    def _is_end(self, gen_repr: Tensor, max_len: int = 500) -> bool:  # TODO: more advanced
+        seq_len = gen_repr.size(1)
+        return seq_len >= max_len
     
-    def _generate_tensor(self, ref_repr: Tensor, main_char: Tensor,
-                         ref_repr_pad: Tensor,
-                         main_char_pad: Tensor) -> Tensor:
-        gen_repr = self._get_start(ref_repr)
+    def _generate_tensor(self, instance_pair: InstancePair,
+                         num_gen: int = 1,
+                         temperature: float = 1.0) -> Tensor:
+        context = instance_pair.context.unsqueeze(0).expand(num_gen, -1)
+        gen_repr = context[:, :1]  # bos token
         while not self._is_end(gen_repr):
-            next_tensor = self._generate_next_tensor(ref_repr, main_char, gen_repr,
-                                                     ref_repr_pad, main_char_pad)
-            gen_repr = torch.cat([gen_repr, next_tensor], dim=1)
+            input = torch.cat([context, gen_repr], dim=1)
+            next_token = self._generate_next_token(input=input,
+                                                   temperature=temperature)
+            gen_repr = torch.cat([gen_repr, next_token], dim=1)
         return gen_repr
-    
-    def batch_generate_ink(self, ref_repr: Tensor, main_char: Tensor, 
-                           ref_repr_pad: Tensor,
-                           main_char_pad: Tensor) -> list[DigitalInk]:
+        
+    def generate_inks(self, instance_pair: InstancePair,
+                      num_gen: int = 1,
+                      temperature: float = 1.0) -> list[DigitalInk]:
         if self.training:
             raise ValueError("Generation is not supported in training mode")
 
+        ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._model_id.repr_id)
         with torch.no_grad():
-            tensor = self._generate_tensor(ref_repr, main_char, ref_repr_pad, main_char_pad)
-            inks = [DefaultReprFactory.tensor_to_ink(id=self._model_id.repr_id, tensor=instance_tensor)
-                    for instance_tensor in tensor]
+            tensor = self._generate_tensor(instance_pair=instance_pair,
+                                           num_gen=num_gen,
+                                           temperature=temperature)
+            inks = [ink_callable(tensor=gen_repr) for gen_repr in tensor]
             return inks
     
     def monitor(self, batch: Batch) -> None:
+        assert isinstance(batch, PairBatch)
         sample = batch.get_random_sample()
-        main_batch, ref_batch = sample.main_batch, sample.reference_batch
-
-        if ref_batch is None:
-            raise ValueError("Reference batch is required for generation model")
-        
-        ink = self.batch_generate_ink(ref_batch.repr, main_batch.char,
-                                      ref_batch.repr_pad, main_batch.char_pad)[0]
-        ink.visualise(name=main_batch.instances[0].parsed.text)
+        instance_pair = sample.datapoints[0]
+        ink = self.generate_inks(instance_pair=instance_pair)[0]
+        ink.visualise(name=instance_pair.main_instance.parsed.text)
 
         
 if __name__ == "__main__":
@@ -123,7 +95,7 @@ if __name__ == "__main__":
     from model.factory import ReprEmbedderFactory
     from core.utils import distributed_context
 
-    for model_id in ModelId.create_task_model_ids(Task.GENERATION)[:]:
+    for model_id in ModelId.create_task_defaults(Task.GENERATION):
         print(model_id)
         train_loader, val_loader, test_loader = create_dataloaders(
             model_id=model_id,
@@ -134,7 +106,7 @@ if __name__ == "__main__":
         )
 
         repr_embedder = ReprEmbedderFactory.create(model_id)
-        model = GenerationModel(repr_embedder, model_id).to(distributed_context.device)
+        model = GenerationModel(model_id).to(distributed_context.device)
         for batch in train_loader:
             model.monitor(batch)
             break

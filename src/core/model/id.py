@@ -19,6 +19,10 @@ class ModelId:
 
     def __str__(self) -> str:
         return f"Task: {self.task.value}, Repr: {self.repr_id}"
+    
+    @classmethod
+    def create_task_defaults(cls, task: Task) -> list[Self]:
+        return [cls(task=task, repr_id=TokenReprId.create_scribe())]
 
     @classmethod
     def create_defaults(cls) -> list[Self]:

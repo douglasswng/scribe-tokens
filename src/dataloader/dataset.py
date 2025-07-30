@@ -3,10 +3,10 @@ from collections import defaultdict
 import random
 from functools import partial
 
-import torch
 from torch.utils.data import Dataset
 
-from core.data_schema import Parsed, IdMapper, Instance
+from core.data_schema import Parsed, Instance
+from core.repr.id import ReprId
 from core.model import ModelId
 from repr.factory import DefaultReprFactory
 from dataloader.augmenter import Augmenter
@@ -15,15 +15,15 @@ from dataloader.split import DataSplit
 
 class ParsedDataset(Dataset):
     def __init__(self,
-                 model_id: ModelId,
+                 repr_id: ReprId,
                  parsed_paths: list[Path],
                  augment: bool,
                  use_reference: bool):
-        self._model_id = model_id
         self._parsed_paths = parsed_paths
         self._augment = augment
         self._use_reference = use_reference
 
+        self._repr_callable = partial(DefaultReprFactory.ink_to_tensor, repr_id)
         self._writer_idxs = self._build_writer_idxs()  # for reference
         self._parsed_to_instance: dict[str, Instance] = {}  # for caching
 
@@ -46,13 +46,7 @@ class ParsedDataset(Dataset):
         return parsed
     
     def _to_instance(self, parsed: Parsed) -> Instance:
-        repr_tensor = DefaultReprFactory.ink_to_tensor(self._model_id.repr_id, parsed.ink)
-        writer_id = IdMapper.writer_to_id(parsed.writer)
-        char_ids = IdMapper.str_to_ids(parsed.text)
-        return Instance(parsed=parsed,
-                        repr_tensor=repr_tensor,
-                        writer_id_tensor=torch.tensor([writer_id]),
-                        char_ids_tensor=torch.tensor(char_ids))
+        return Instance(parsed=parsed, repr_callable=self._repr_callable)
     
     def _get_instance(self, parsed: Parsed) -> Instance:
         if self._augment:
@@ -83,7 +77,7 @@ class ParsedDataset(Dataset):
 def create_datasets(model_id: ModelId, datasplit: DataSplit
                     ) -> tuple[ParsedDataset, ParsedDataset, ParsedDataset]:
     partial_parsed_dataset = partial(ParsedDataset,
-                                     model_id=model_id,
+                                     repr_id=model_id.repr_id,
                                      use_reference=model_id.use_reference)
     
     train_paths, val_paths, test_paths = datasplit.get_splits()

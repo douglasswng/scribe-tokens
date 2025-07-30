@@ -53,6 +53,7 @@ class TransformerDecoder(nn.Module):
         start_pos: int = 0
     ) -> torch.Tensor:
         # Create causal mask
+        seq_len = x.shape[1]
         mask = self.create_causal_mask(seq_len, x.device)
         
         # Pass through decoder layers

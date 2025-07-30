@@ -41,6 +41,15 @@ class LocalModel(ModelMixin, nn.Module):
     @property
     def num_embedding_params(self) -> int:
         return VOCAB_SIZE * HIDDEN_DIM
+    
+    def init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.Embedding):
+                nn.init.normal_(module.weight, std=0.02)
 
 
 class DistributedModel(DDP):

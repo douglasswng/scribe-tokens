@@ -1,13 +1,11 @@
 from typing import Self
 from dataclasses import dataclass, replace
-from functools import cached_property
 import random
 
 import torch
 from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 
-from core.utils.distributed_context import distributed_context
 from core.data_schema.instance import Instance
 
 

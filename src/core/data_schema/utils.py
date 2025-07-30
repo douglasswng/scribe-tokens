@@ -1,4 +1,4 @@
-from core.constants import WRITERS, CHARS
+from core.constants import WRITERS, CHARS, NUM_CHARS
 
 
 class IdMapper:
@@ -26,9 +26,8 @@ class IdMapper:
     
     @classmethod
     def str_to_ids(cls, s: str) -> list[int]:
-        max_id = max(cls._CHAR_ID_MAP.values())
-        bos_id = max_id + 1
-        eos_id = max_id + 2
+        bos_id = NUM_CHARS + 1
+        eos_id = NUM_CHARS + 2
         
         ids = cls.chars_to_ids(list(s))
         ids = [bos_id] + ids + [eos_id]
@@ -37,3 +36,7 @@ class IdMapper:
     @classmethod
     def ids_to_str(cls, ids: list[int]) -> str:
         return ''.join(cls.ids_to_chars(ids))
+    
+
+if __name__ == "__main__":
+    print(IdMapper.str_to_ids("Hello, world!"))

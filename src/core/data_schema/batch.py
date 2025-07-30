@@ -28,12 +28,20 @@ class InstanceBatch:
         return self._repr_and_pad[1].to(self.device)
     
     @property
-    def char(self) -> Tensor:
+    def char_input(self) -> Tensor:
         return self._char_and_pad[0].to(self.device)
     
     @property
-    def char_pad(self) -> Tensor:
+    def char_input_pad(self) -> Tensor:
         return self._char_and_pad[1].to(self.device)
+    
+    @property
+    def char_target(self) -> Tensor:
+        return self.char_input[:, 1:-1].to(self.device)  # drop bos and eos
+    
+    @property
+    def char_target_pad(self) -> Tensor:
+        return self.char_input_pad[:, 1:-1].to(self.device)  # drop bos and eos
     
     @property
     def writer(self) -> Tensor:

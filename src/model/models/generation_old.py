@@ -3,6 +3,7 @@ from functools import partial
 import torch
 from torch import Tensor
 import torch.nn as nn
+from torch.nn.utils.rnn import pad_sequence
 
 from core.model import LocalModel, ModelId
 from core.data_schema import Batch, DigitalInk, PairBatch, InstancePair
@@ -20,24 +21,8 @@ class GenerationModel(LocalModel):
         self._char_embedder: Embedder = CharEmbedder()
         self._decoder = TransformerDecoder()
 
-    def _forward(self, input: torch.Tensor,
-                 ref_repr_lengths: list[int],
-                 main_char_input_lengths: list[int]) -> Tensor:
-        char_mask = torch.zeros_like(input, dtype=torch.bool)
-        
-        for i, (ref_repr_len, main_char_input_len) in enumerate(zip(ref_repr_lengths, main_char_input_lengths)):
-            char_mask[i, ref_repr_len:ref_repr_len+main_char_input_len] = True
-
-        repr_mask = ~char_mask
-            
-        repr_input = input * repr_mask
-        char_input = input * char_mask
-        
-        repr_embedded = self._repr_embedder.embed(repr_input) * repr_mask.unsqueeze(-1) 
-        char_embedded = self._char_embedder.embed(char_input) * char_mask.unsqueeze(-1)
-        combined_input = repr_embedded + char_embedded
-        
-        output = self._decoder(combined_input)
+    def _forward(self, input: torch.Tensor) -> Tensor:
+        output = self._decoder(input)
         logits = self._repr_embedder.unembed(output)
         return logits
     
@@ -53,26 +38,54 @@ class GenerationModel(LocalModel):
         loss = criterion(logits_flat, target_flat)
         masked_loss = loss * padding_flat
         return masked_loss.sum() / padding_flat.sum()
+    
+    def _prepare_context(self, instance_pair: InstancePair) -> Tensor:
+        ref_repr = instance_pair.ref_instance.repr
+        ref_repr_embed = self._repr_embedder.embed(ref_repr)
+
+        main_char_input = instance_pair.main_instance.char_input
+        main_char_embed = self._char_embedder.embed(main_char_input)
+
+        context_embed = torch.cat([ref_repr_embed, main_char_embed])
+        return context_embed
+    
+    def _prepare_batch(self, batch: PairBatch) -> tuple[Tensor, Tensor, Tensor]:
+        inputs = []
+        targets = []
+        paddings = []
+        for instance_pair in batch.datapoints:
+            context_embed = self._prepare_context(instance_pair)
+
+            main_repr_input = instance_pair.main_instance.repr_input
+            main_repr_input_embed = self._repr_embedder(main_repr_input)
+
+            main_repr_target = instance_pair.main_instance.repr_target
+            main_repr_target_embed = self._repr_embedder(main_repr_target)
+
+            input = torch.cat([context_embed, main_repr_input_embed])
+            target = torch.cat([context_embed, main_repr_target_embed])
+
+            context_len = context_embed.size(0)
+            target_len = main_repr_target.size(0)
+            padding = torch.cat([torch.zeros(context_len), torch.ones(target_len)])
+
+            inputs.append(input)
+            targets.append(target)
+            paddings.append(padding)
+        input = pad_sequence(inputs, batch_first=True, padding_value=0)
+        target = pad_sequence(targets, batch_first=True, padding_value=0)
+        padding = pad_sequence(paddings, batch_first=True, padding_value=0)
+        return input, target, padding
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
         assert isinstance(batch, PairBatch)
-        main_repr_pred = self._forward(
-            input=batch.input,
-            ref_repr_lengths=batch.ref_repr_lengths,
-            main_char_input_lengths=batch.main_char_input_lengths
-        )
-        loss = self._ce_loss(main_repr_pred, batch.target, batch.padding)
+        input, target, padding = self._prepare_batch(batch)
+        main_repr_pred = self._forward(input)
+        loss = self._ce_loss(main_repr_pred, target, padding)
         return {'ntp_ce': loss}
     
-    def _generate_next_token(self, input: Tensor, 
-                             ref_repr_lengths: list[int],
-                             main_char_input_lengths: list[int],
-                             temperature: float = 1.0) -> Tensor:
-        gen_repr_pred = self._forward(
-            input=input,
-            ref_repr_lengths=ref_repr_lengths,
-            main_char_input_lengths=main_char_input_lengths
-        )
+    def _generate_next_token(self, input: Tensor, temperature: float = 1.0) -> Tensor:
+        gen_repr_pred = self._forward(input=input)
         last_pred = gen_repr_pred[:, -1]
         token_probs = torch.softmax(last_pred / temperature, dim=-1)
         token_indices = torch.multinomial(token_probs, 1)  # Keep shape [batch_size, 1]
@@ -85,20 +98,13 @@ class GenerationModel(LocalModel):
     def _generate_tensor(self, instance_pair: InstancePair,
                          num_gen: int = 1,
                          temperature: float = 1.0) -> Tensor:
-        context = instance_pair.context.unsqueeze(0).expand(num_gen, -1)
+        context = self._prepare_context(instance_pair).unsqueeze(0).expand(num_gen, -1, -1)
         gen_repr = context[:, :1]  # bos token
-        
-        ref_repr_lengths = [instance_pair.ref_repr_length] * num_gen
-        main_char_input_lengths = [instance_pair.main_char_input_length] * num_gen
-        
         while not self._is_end(gen_repr):
             input = torch.cat([context, gen_repr], dim=1)
-            next_token = self._generate_next_token(
-                input=input,
-                ref_repr_lengths=ref_repr_lengths,
-                main_char_input_lengths=main_char_input_lengths,
-                temperature=temperature
-            )
+            next_token = self._generate_next_token(input=input,
+                                                   temperature=temperature)
+            next
             gen_repr = torch.cat([gen_repr, next_token], dim=1)
         return gen_repr
         
@@ -139,11 +145,7 @@ if __name__ == "__main__":
         )
 
         model = GenerationModel(model_id).to(distributed_context.device)
+        model.eval()
         for batch in train_loader:
-            model.train()
-            losses = model.losses(batch)
-            print(f"Losses: {losses}")
-
-            model.eval()
             model.monitor(batch)
             break

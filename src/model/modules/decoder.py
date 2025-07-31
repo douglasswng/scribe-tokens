@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from model.modules.decoder_layer import TransformerDecoderLayer
-from core.constants import HIDDEN_DIM, NUM_HEADS, FFN_FACTOR, DROPOUT, NUM_LAYERS
+from core.constants import HIDDEN_DIM, NUM_HEADS, FFN_FACTOR, DROPOUT, NUM_LAYERS, MAX_LEN
 
 
 class TransformerDecoder(nn.Module):
@@ -14,8 +14,8 @@ class TransformerDecoder(nn.Module):
         n_heads: int = NUM_HEADS,
         n_layers: int = NUM_LAYERS,
         ffn_factor: float = FFN_FACTOR,
+        max_seq_len: int = MAX_LEN,
         dropout: float = DROPOUT,
-        max_seq_len: int = 8192
     ):
         super().__init__()
         self.d_model = d_model

@@ -33,19 +33,19 @@ NUM_CHARS = len(CHARS)  # 79
 
 # Experiment hyperparameters
 VOCAB_SIZE = 25000
-DELTA = 2
+DELTA = 1
 MAX_LEN = int(1e5)
 SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
-# Model hyperparameters
-HIDDEN_DIM = 256
+# Model hyperparameters (aim for 10M params)
+HIDDEN_DIM = 384
 FFN_FACTOR = 8/3  # use swiglu ffn
-NUM_LAYERS = 6
-NUM_HEADS = 4
+NUM_LAYERS = 8
+NUM_HEADS = 6
 DROPOUT = 0.1
 
 # Training hyperparameters
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
 NUM_EPOCHS = 1000
 PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs

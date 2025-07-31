@@ -84,9 +84,10 @@ class GenerationModel(LocalModel):
         token_indices = torch.multinomial(token_probs, 1)  # Keep shape [batch_size, 1]
         return token_indices
     
-    def _is_end(self, gen_repr: Tensor, max_len: int=500) -> bool:  # TODO: more advanced
-        seq_len = gen_repr.size(1)
-        return seq_len >= max_len
+    def _is_end(self, gen_repr: Tensor, max_len: int=1000) -> bool:  # TODO: more advanced
+        if gen_repr.size(1) > max_len:
+            return True
+        return False
     
     def _generate_tensor(self, instance_pair: InstancePair,
                          num_gen: int = 1,

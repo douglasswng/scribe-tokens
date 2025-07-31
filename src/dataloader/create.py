@@ -91,10 +91,10 @@ if __name__ == "__main__":
                 for batch in train_loader:
                     batch: Batch
                     assert isinstance(batch, PairBatch)
-                    batch.input
-                    batch.char_mask
-                    batch.target
-                    batch.target_mask
+                    batch.input.shape
+                    batch.char_mask.shape
+                    batch.target.shape
+                    batch.target_mask.shape
                     pass  # Simulate training step
                 elapsed = time.time() - start
                 if distributed_context.is_master:

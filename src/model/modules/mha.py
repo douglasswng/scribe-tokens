@@ -62,7 +62,7 @@ class MultiHeadAttention(nn.Module):
         
         # Apply causal mask
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, float('-inf'))
+            scores = scores.masked_fill(mask, float('-inf'))
         
         # Apply softmax
         attn_weights = F.softmax(scores, dim=-1)

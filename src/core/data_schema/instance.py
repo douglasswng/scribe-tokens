@@ -1,23 +1,18 @@
-from typing import Callable
 from dataclasses import dataclass
 from functools import cached_property
 
 import torch
 from torch import Tensor
 
-from core.data_schema.ink import DigitalInk
 from core.data_schema.parsed import Parsed
 from core.data_schema.utils import IdMapper
 from core.utils.distributed_context import distributed_context
 
 
-type ReprCallable = Callable[[DigitalInk], Tensor]
-
-
 @dataclass(frozen=True)
 class Instance:
     parsed: Parsed
-    repr_callable: ReprCallable
+    _repr: Tensor
 
     @property
     def device(self) -> str:
@@ -25,7 +20,7 @@ class Instance:
 
     @cached_property
     def repr(self) -> Tensor:
-        return self.repr_callable(self.parsed.ink).to(self.device)
+        return self._repr.to(self.device)
     
     @cached_property
     def writer(self) -> Tensor:

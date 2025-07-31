@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from model.modules.decoder_layer import TransformerDecoderLayer
+from core.constants import HIDDEN_DIM, NUM_HEADS, FFN_FACTOR, DROPOUT, NUM_LAYERS
 
 
 class TransformerDecoder(nn.Module):
@@ -9,11 +10,11 @@ class TransformerDecoder(nn.Module):
     
     def __init__(
         self,
-        d_model: int = 512,
-        n_heads: int = 8,
-        n_layers: int = 6,
-        ffn_factor: float = 8/3,
-        dropout: float = 0.1,
+        d_model: int = HIDDEN_DIM,
+        n_heads: int = NUM_HEADS,
+        n_layers: int = NUM_LAYERS,
+        ffn_factor: float = FFN_FACTOR,
+        dropout: float = DROPOUT,
         max_seq_len: int = 8192
     ):
         super().__init__()
@@ -30,17 +31,6 @@ class TransformerDecoder(nn.Module):
         self.norm = nn.RMSNorm(d_model)
 
         self.dropout = nn.Dropout(dropout)
-
-         # Initialize weights
-        self._init_weights()
-    
-    def _init_weights(self):
-        """Initialize weights using Xavier/Glorot initialization"""
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
 
     def create_causal_mask(self, seq_len: int, device: torch.device) -> torch.Tensor:
         """Create causal (lower triangular) mask"""

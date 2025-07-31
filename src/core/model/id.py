@@ -7,9 +7,9 @@ from core.repr import ReprId, TokenReprId
 
 class Task(Enum):
     GENERATION = 'generation'
-    PRETRAINING = 'pretraining'
-    RECOGNITION_SFT = 'recognition_sft'
-    POSTTRAINING = 'posttraining'
+    # PRETRAINING = 'pretraining'
+    # RECOGNITION_SFT = 'recognition_sft'
+    # POSTTRAINING = 'posttraining'
 
 
 @dataclass(frozen=True)

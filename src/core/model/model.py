@@ -69,6 +69,10 @@ class DistributedModel(DDP):
     def num_params(self) -> int:
         return self.local_model.num_params
     
+    @property
+    def num_embedding_params(self) -> int:
+        return self.local_model.num_embedding_params
+    
     def monitor(self, batch: Batch) -> None:
         return self.local_model.monitor(batch)
     

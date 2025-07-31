@@ -7,17 +7,23 @@ from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA
 
 def scale_coords(coords: list[np.ndarray], scale_factor: float) -> list[np.ndarray]:
     """Apply scaling transformation to coordinates."""
+    if scale_factor == 1:
+        return coords
     return [stroke_coords * scale_factor for stroke_coords in coords]
 
 
 def shear_coords(coords: list[np.ndarray], shear_factor: float) -> list[np.ndarray]:
     """Apply shearing transformation to coordinates."""
+    if shear_factor == 0:
+        return coords
     shear_matrix = np.array([[1, shear_factor], [0, 1]])
     return [stroke_coords @ shear_matrix.T for stroke_coords in coords]
 
 
 def rotate_coords(coords: list[np.ndarray], angle_degrees: float) -> list[np.ndarray]:
     """Apply rotation transformation to coordinates."""
+    if angle_degrees == 0:
+        return coords
     angle_rad = np.radians(angle_degrees)
     cos_a = np.cos(angle_rad)
     sin_a = np.sin(angle_rad)
@@ -27,7 +33,7 @@ def rotate_coords(coords: list[np.ndarray], angle_degrees: float) -> list[np.nda
 
 def jitter_coords(coords: list[np.ndarray], sigma: float) -> list[np.ndarray]:
     """Apply jitter (random noise) to coordinates."""
-    if sigma <= 0:
+    if sigma == 0:
         return coords
     
     jittered_coords = []
@@ -78,7 +84,15 @@ class Augmenter:
 
 
 if __name__ == "__main__":
+    from repr.factory import DefaultReprFactory
+    from core.repr import TokenReprId
+
     parsed = Parsed.load_random()
     parsed.visualise()
     augmented_parsed = Augmenter.augment(parsed)
     augmented_parsed.visualise()
+
+    repr_id = TokenReprId.create_scribe()
+    tensor = DefaultReprFactory.ink_to_tensor(repr_id, augmented_parsed.ink)
+    ink = DefaultReprFactory.tensor_to_ink(repr_id, tensor)
+    ink.visualise()

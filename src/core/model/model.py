@@ -44,12 +44,15 @@ class LocalModel(ModelMixin, nn.Module):
     
     def init_weights(self):
         for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
-            elif isinstance(module, nn.Embedding):
-                nn.init.normal_(module.weight, std=0.02)
+            match module:
+                case nn.Linear():
+                    torch.nn.init.normal_(module.weight, std=0.02)
+                case nn.Embedding():
+                    torch.nn.init.normal_(module.weight, std=0.02)
+                case nn.RMSNorm():
+                    torch.nn.init.ones_(module.weight)
+                case _:
+                    pass
 
 
 class DistributedModel(DDP):

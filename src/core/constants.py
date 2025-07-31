@@ -32,27 +32,27 @@ CHARS = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 NUM_CHARS = len(CHARS)  # 79
 
 # Experiment hyperparameters
-VOCAB_SIZE = 25000
-DELTA = 2
-MAX_LEN = int(1e5)
+VOCAB_SIZE = 50000
+DELTA = 4
+MAX_LEN = int(1e4)
 SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
 # Model hyperparameters
-HIDDEN_DIM = 128
+HIDDEN_DIM = 384
 FFN_FACTOR = 8/3  # use swiglu ffn
-NUM_LAYERS = 6
-NUM_HEADS = 4
+NUM_LAYERS = 12
+NUM_HEADS = 6
 DROPOUT = 0.1
 
 # Training hyperparameters
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 200
 PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs
-WEIGHT_DECAY = 1e-2
+WEIGHT_DECAY = 0.1
 
 # Augmenter hyperparameters
-SCALE_RANGE = 0.2  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
+SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
 SHEAR_FACTOR = 0.5  # shear factor between (-SHEAR_FACTOR, SHEAR_FACTOR)
 ROTATE_ANGLE = 5  # rotate angle (degrees) between (-ROTATE_ANGLE, ROTATE_ANGLE)
 JITTER_SIGMA = 5  # the std of gaussian noise added to the points

@@ -1,0 +1,9 @@
+ujson
+numpy
+torch
+pydantic
+matplotlib
+scipy
+tokenizers
+mlflow
+swanlab

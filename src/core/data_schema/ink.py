@@ -42,26 +42,8 @@ class Point[T: (float, int)](BaseModel):
     def __mul__(self, other: float) -> 'Point':
         return Point(x=self.x * other, y=self.y * other)
     
-    def shear(self, shear_factor: float) -> 'Point':
-        return Point(x=self.x + shear_factor * self.y, y=self.y)
-    
-    def rotate(self, angle_degrees: float) -> 'Point':
-        angle_rad = math.radians(angle_degrees)
-        cos_a = math.cos(angle_rad)
-        sin_a = math.sin(angle_rad)
-        
-        new_x = self.x * cos_a - self.y * sin_a
-        new_y = self.x * sin_a + self.y * cos_a
-        
-        return Point(x=new_x, y=new_y)
-    
     def round(self) -> 'Point[int]':
         return Point(x=round(self.x), y=round(self.y))
-    
-    def jitter(self, sigma: float) -> 'Point':
-        jitter_x = np.random.normal(0, sigma)
-        jitter_y = np.random.normal(0, sigma)
-        return Point(x=self.x + jitter_x, y=self.y + jitter_y)
 
 
 class Stroke[T: (float, int)](BaseModel):
@@ -88,12 +70,6 @@ class Stroke[T: (float, int)](BaseModel):
     
     def scale_y(self, scale: float) -> 'Stroke':
         return Stroke(points=[Point(x=point.x, y=point.y * scale) for point in self.points])
-    
-    def shear(self, shear_factor: float) -> 'Stroke':
-        return Stroke(points=[point.shear(shear_factor) for point in self.points])
-    
-    def rotate(self, angle_degrees: float) -> 'Stroke':
-        return Stroke(points=[point.rotate(angle_degrees) for point in self.points])
     
     def discretise(self) -> 'Stroke[int]':
         return Stroke(points=[point.round() for point in self.points])
@@ -124,9 +100,6 @@ class Stroke[T: (float, int)](BaseModel):
         
         smoothed_points = [Point(x=float(x), y=float(y)) for x, y in zip(smoothed_x, smoothed_y)]
         return Stroke(points=smoothed_points)
-    
-    def jitter(self, sigma: float) -> 'Stroke':
-        return Stroke(points=[point.jitter(sigma) for point in self.points])
 
 
 class DigitalInk[T: (float, int)](BaseModel):
@@ -147,14 +120,18 @@ class DigitalInk[T: (float, int)](BaseModel):
 
     @overload
     @classmethod
-    def from_coords(cls, raw_strokes: list[list[tuple[int, int]]], to_origin: bool=True) -> 'DigitalInk[int]': ...
+    def from_coords(cls, raw_strokes: list[list[tuple[int, int]]], to_origin: bool=False) -> 'DigitalInk[int]': ...
     
     @overload
     @classmethod
-    def from_coords(cls, raw_strokes: list[list[tuple[float, float]]], to_origin: bool=True) -> 'DigitalInk[float]': ...
+    def from_coords(cls, raw_strokes: list[list[tuple[float, float]]], to_origin: bool=False) -> 'DigitalInk[float]': ...
+
+    @overload
+    @classmethod
+    def from_coords(cls, raw_strokes: list[np.ndarray], to_origin: bool=False) -> 'DigitalInk': ...
 
     @classmethod
-    def from_coords(cls, raw_strokes, to_origin: bool=True):
+    def from_coords(cls, raw_strokes, to_origin: bool=False):
         strokes = []
         for stroke in raw_strokes:
             points = [Point(x=coord[0], y=coord[1]) for coord in stroke]
@@ -194,9 +171,12 @@ class DigitalInk[T: (float, int)](BaseModel):
     def start(self) -> Point:
         return self.strokes[0].points[0]
 
+    def to_coords(self) -> list[list[tuple[float, float]]]:
+        return [[(point.x, point.y) for point in stroke.points] for stroke in self.strokes]
+
     def to_origin(self) -> 'DigitalInk':
-        top_left, _ = self.bbox
-        return self.shift(-top_left)
+        start = self.strokes[0].points[0]
+        return self.shift(-start)
     
     def shift(self, shift: Point) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.shift(shift) for stroke in self.strokes])
@@ -210,12 +190,6 @@ class DigitalInk[T: (float, int)](BaseModel):
     def scale_y(self, scale: float) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.scale_y(scale) for stroke in self.strokes])
     
-    def shear(self, shear_factor: float) -> 'DigitalInk':
-        return DigitalInk(strokes=[stroke.shear(shear_factor) for stroke in self.strokes])
-    
-    def rotate(self, angle_degrees: float) -> 'DigitalInk':
-        return DigitalInk(strokes=[stroke.rotate(angle_degrees) for stroke in self.strokes])
-    
     def discretise(self) -> 'DigitalInk[int]':
         return DigitalInk(strokes=[stroke.discretise() for stroke in self.strokes])
 
@@ -224,9 +198,6 @@ class DigitalInk[T: (float, int)](BaseModel):
 
     def smooth(self, window_length: int, polyorder: int) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.smooth(window_length, polyorder) for stroke in self.strokes])
-    
-    def jitter(self, sigma: float) -> 'DigitalInk':
-        return DigitalInk(strokes=[stroke.jitter(sigma) for stroke in self.strokes])
     
     def visualise(self, connect: bool=True, name: str | None = None) -> None:
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -249,9 +220,6 @@ class DigitalInk[T: (float, int)](BaseModel):
             name = re.sub(r'[^\w\-_\.]', '_', name)[:50]
             name = f"{count}_{name}"
         
-        # plt.show()
-        # return  # for debugging
-
         pdf_path = TMP_DIR / f'{name}.pdf'
         pdf_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(pdf_path, format='pdf', bbox_inches='tight')

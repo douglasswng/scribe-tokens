@@ -15,30 +15,28 @@ class InstancePair:
     ref_instance: Instance
 
     @property
-    def char_mask(self) -> Tensor:
-        char_mask = torch.zeros_like(self.context, dtype=torch.bool)
-        repr_len = len(self.ref_instance.repr)
-        char_mask[repr_len:] = True
-        return char_mask
-
-    @property
     def context(self) -> Tensor:
         return torch.cat([self.ref_instance.repr, self.main_instance.char_input])
-
+    
     @property
     def input(self) -> Tensor:
         return torch.cat([self.context, self.main_instance.repr_input])
-
+    
     @property
-    def _target(self) -> Tensor:
+    def target(self) -> Tensor:
         return torch.cat([self.context, self.main_instance.repr_target])
-
+    
     @property
-    def _target_mask(self) -> Tensor:
-        target_mask = torch.ones_like(self._target, dtype=torch.bool)
-        context_len = len(self.context)
-        target_mask[context_len:] = False
-        return target_mask
+    def padding(self) -> Tensor:
+        return torch.cat([torch.zeros_like(self.context), torch.ones_like(self.main_instance.repr_target)])
+    
+    @property
+    def ref_repr_length(self) -> int:
+        return self.ref_instance.repr.size(0)
+    
+    @property
+    def main_char_input_length(self) -> int:
+        return self.main_instance.char_input.size(0)
 
 
 @dataclass(frozen=True)
@@ -48,22 +46,25 @@ class PairBatch:
     @property
     def input(self) -> Tensor:
         inputs = [instance.input for instance in self.datapoints]
-        return self._pad_sequence(inputs)
-
-    @property
-    def char_mask(self) -> Tensor:
-        char_masks = [instance.char_mask for instance in self.datapoints]
-        return self._pad_sequence(char_masks)
-
+        return pad_sequence(inputs, batch_first=True, padding_value=0)
+    
     @property
     def target(self) -> Tensor:
-        targets = [instance._target for instance in self.datapoints]
-        return self._pad_sequence(targets)
-
+        targets = [instance.target for instance in self.datapoints]
+        return pad_sequence(targets, batch_first=True, padding_value=0)
+    
     @property
-    def target_mask(self) -> Tensor:
-        target_masks = [instance._target_mask for instance in self.datapoints]
-        return self._pad_sequence(target_masks)
+    def padding(self) -> Tensor:
+        paddings = [instance.padding for instance in self.datapoints]
+        return pad_sequence(paddings, batch_first=True, padding_value=0)
+    
+    @property
+    def ref_repr_lengths(self) -> list[int]:
+        return [instance.ref_repr_length for instance in self.datapoints]
+    
+    @property
+    def main_char_input_lengths(self) -> list[int]:
+        return [instance.main_char_input_length for instance in self.datapoints]
 
     def get_sample(self, idx: int) -> Self:
         return replace(self, datapoints=[self.datapoints[idx]])
@@ -71,9 +72,6 @@ class PairBatch:
     def get_random_sample(self) -> Self:
         random_idx = random.randint(0, len(self.datapoints) - 1)
         return self.get_sample(random_idx)
-
-    def _pad_sequence(self, tensors: list[Tensor]) -> Tensor:
-        return pad_sequence(tensors, batch_first=True, padding_value=0)
     
 
 @dataclass(frozen=True)

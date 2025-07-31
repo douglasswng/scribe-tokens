@@ -20,23 +20,21 @@ class GenerationModel(LocalModel):
         self._char_embedder: Embedder = CharEmbedder()
         self._decoder = TransformerDecoder()
 
-    def _extend_char_mask(self, input: Tensor, char_mask: Tensor) -> Tensor:
-        extended_char_mask = torch.zeros_like(input, dtype=torch.bool)
-        extended_char_mask[char_mask] = True
-        return extended_char_mask
-
     def _forward(self, input: torch.Tensor,
-                 char_mask: Tensor) -> Tensor:
-        char_mask = self._extend_char_mask(input=input, char_mask=char_mask)
-        repr_mask = ~char_mask
+                 ref_repr_lengths: list[int],
+                 main_char_input_lengths: list[int]) -> Tensor:
+        char_mask = torch.zeros_like(input, dtype=torch.bool)
         
+        for i, (ref_repr_len, main_char_input_len) in enumerate(zip(ref_repr_lengths, main_char_input_lengths)):
+            char_mask[i, ref_repr_len:ref_repr_len+main_char_input_len] = True
+
+        repr_mask = ~char_mask
+            
         repr_input = input * repr_mask
         char_input = input * char_mask
         
-        repr_embedded = self._repr_embedder.embed(repr_input)
-        char_embedded = self._char_embedder.embed(char_input)
-
-        assert repr_embedded == repr_embedded * repr_mask.unsqueeze(-1)  # TODO: remove this assert later
+        repr_embedded = self._repr_embedder.embed(repr_input) * repr_mask.unsqueeze(-1) 
+        char_embedded = self._char_embedder.embed(char_input) * char_mask.unsqueeze(-1)
         combined_input = repr_embedded + char_embedded
         
         output = self._decoder(combined_input)
@@ -46,31 +44,34 @@ class GenerationModel(LocalModel):
     def _ce_loss(self,
                  pred: Tensor,
                  target: Tensor,
-                 mask: Tensor) -> Tensor:
+                 padding: Tensor) -> Tensor:
         logits_flat = pred.reshape(-1, pred.size(-1))
         target_flat = target.reshape(-1)
-        mask_flat = mask.reshape(-1)
+        padding_flat = padding.reshape(-1)
         
         criterion = nn.CrossEntropyLoss(reduction='none')
         loss = criterion(logits_flat, target_flat)
-        masked_loss = loss * mask_flat
-        return masked_loss.sum() / mask_flat.sum()
+        masked_loss = loss * padding_flat
+        return masked_loss.sum() / padding_flat.sum()
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
         assert isinstance(batch, PairBatch)
         main_repr_pred = self._forward(
             input=batch.input,
-            char_mask=batch.char_mask
+            ref_repr_lengths=batch.ref_repr_lengths,
+            main_char_input_lengths=batch.main_char_input_lengths
         )
-        loss = self._ce_loss(main_repr_pred, batch.target, batch.target_mask)
+        loss = self._ce_loss(main_repr_pred, batch.target, batch.padding)
         return {'ntp_ce': loss}
     
     def _generate_next_token(self, input: Tensor, 
-                             char_mask: Tensor,
+                             ref_repr_lengths: list[int],
+                             main_char_input_lengths: list[int],
                              temperature: float = 1.0) -> Tensor:
         gen_repr_pred = self._forward(
             input=input,
-            char_mask=char_mask
+            ref_repr_lengths=ref_repr_lengths,
+            main_char_input_lengths=main_char_input_lengths
         )
         last_pred = gen_repr_pred[:, -1]
         token_probs = torch.softmax(last_pred / temperature, dim=-1)
@@ -85,14 +86,17 @@ class GenerationModel(LocalModel):
                          num_gen: int = 1,
                          temperature: float = 1.0) -> Tensor:
         context = instance_pair.context.unsqueeze(0).expand(num_gen, -1)
-        char_mask = instance_pair.char_mask.unsqueeze(0).expand(num_gen, -1)
         gen_repr = context[:, :1]  # bos token
+        
+        ref_repr_lengths = [instance_pair.ref_repr_length] * num_gen
+        main_char_input_lengths = [instance_pair.main_char_input_length] * num_gen
         
         while not self._is_end(gen_repr):
             input = torch.cat([context, gen_repr], dim=1)
             next_token = self._generate_next_token(
                 input=input,
-                char_mask=char_mask,
+                ref_repr_lengths=ref_repr_lengths,
+                main_char_input_lengths=main_char_input_lengths,
                 temperature=temperature
             )
             gen_repr = torch.cat([gen_repr, next_token], dim=1)

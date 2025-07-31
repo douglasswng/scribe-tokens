@@ -1,6 +1,5 @@
 import random
 import numpy as np
-import time
 
 from core.data_schema import Parsed, DigitalInk
 from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA, AUGMENT_PROB
@@ -60,44 +59,17 @@ class Augmenter:
     @classmethod
     def augment(cls, parsed: Parsed) -> Parsed:
         # Convert to coordinates
-        start_time = time.perf_counter()
         coords = parsed.ink.to_coords()
         np_coords = [np.array(stroke) for stroke in coords]
-        coord_conversion_time = time.perf_counter() - start_time
         
-        # Apply transformations in sequence with timing
-        start_time = time.perf_counter()
+        # Apply transformations in sequence
         np_coords = scale_coords(np_coords, cls._config.scale_factor)
-        scale_time = time.perf_counter() - start_time
-        
-        start_time = time.perf_counter()
         np_coords = shear_coords(np_coords, cls._config.shear_factor)
-        shear_time = time.perf_counter() - start_time
-        
-        start_time = time.perf_counter()
         np_coords = rotate_coords(np_coords, cls._config.rotate_angle)
-        rotate_time = time.perf_counter() - start_time
-        
-        start_time = time.perf_counter()
         np_coords = jitter_coords(np_coords, cls._config.jitter_sigma)
-        jitter_time = time.perf_counter() - start_time
         
         # Convert back to DigitalInk
-        start_time = time.perf_counter()
         augmented_ink = DigitalInk.from_coords(np_coords)
-        ink_conversion_time = time.perf_counter() - start_time
-        
-        # Print timing results
-        total_time = coord_conversion_time + scale_time + shear_time + rotate_time + jitter_time + ink_conversion_time
-        print(f"Augmentation timing:")
-        print(f"  Coord conversion: {coord_conversion_time*1000:.3f}ms")
-        print(f"  Scale:           {scale_time*1000:.3f}ms")
-        print(f"  Shear:           {shear_time*1000:.3f}ms")
-        print(f"  Rotate:          {rotate_time*1000:.3f}ms")
-        print(f"  Jitter:          {jitter_time*1000:.3f}ms")
-        print(f"  Ink conversion:  {ink_conversion_time*1000:.3f}ms")
-        print(f"  Total:           {total_time*1000:.3f}ms")
-        
         return parsed.model_copy(update={"ink": augmented_ink})
     
     @classmethod

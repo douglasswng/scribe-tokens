@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from core.utils import set_random_seed
-from core.constants import PARSED_DIR
+from core.constants import PARSED_DIR, BLACKLIST_PATH
 
 
 def split_paths(paths: list[Path], train_ratio: float) -> tuple[list[Path], list[Path], list[Path]]:
@@ -20,6 +20,11 @@ def split_paths(paths: list[Path], train_ratio: float) -> tuple[list[Path], list
     return train_paths, val_paths, test_paths
 
 
+def get_blacklist() -> set[str]:
+    with open(BLACKLIST_PATH, 'r') as f:
+        return {line.strip() for line in f.readlines()}
+
+
 @lru_cache(maxsize=1)
 def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
     RANDOM_SEED = 42
@@ -27,7 +32,8 @@ def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
 
     set_random_seed(RANDOM_SEED)
     parsed_paths = list(PARSED_DIR.rglob('*.json'))[:100]
-    return split_paths(parsed_paths, TRAIN_RATIO)
+    valid_paths = [path for path in parsed_paths if path.stem not in get_blacklist()]
+    return split_paths(valid_paths, TRAIN_RATIO)
 
 
 @dataclass(frozen=True)

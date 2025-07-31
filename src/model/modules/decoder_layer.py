@@ -36,7 +36,6 @@ class TransformerDecoderLayer(nn.Module):
         # Feed-forward with residual connection and layer norm
         ff_out = self.feed_forward(self.norm2(x))
         x = x + self.dropout(ff_out)
-        
         return x
     
 
@@ -44,4 +43,6 @@ if __name__ == "__main__":
     batch_size, seq_len, num_heads, head_dim = 1, 1024, 16, 64
     decoder_layer = TransformerDecoderLayer(head_dim, num_heads, head_dim * 4)
     x = torch.randn(batch_size, seq_len, head_dim)
-    print(decoder_layer(x).shape)
+    x = decoder_layer(x)
+    print(x.shape)
+    print(torch.any(torch.isnan(x)))

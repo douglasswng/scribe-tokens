@@ -57,7 +57,8 @@ class TransformerDecoder(nn.Module):
 
 
 if __name__ == "__main__":
-    batch_size, seq_len, num_heads, head_dim = 1, 1024, 16, 64
-    decoder = TransformerDecoder(head_dim, num_heads, head_dim * 4)
-    x = torch.randn(batch_size, seq_len, head_dim)
-    print(decoder(x).shape)
+    decoder = TransformerDecoder(d_model=128, n_heads=4, n_layers=1, ffn_factor=8/3, dropout=0.1, max_seq_len=1024)
+    x = torch.randn(2, 1024, 128)
+    x = decoder(x)
+    print(x.shape)
+    print(torch.any(torch.isnan(x)))

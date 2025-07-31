@@ -23,6 +23,9 @@ if __name__ == "__main__":
     from core.utils import clear_folder
     from core.utils.distributed_context import distributed_context
     from core.constants import CHECKPOINTS_DIR, MODELS_DIR, TRACKERS_DIR
+
+    import torch
+    torch.autograd.set_detect_anomaly(True)
     
     if distributed_context.is_master:
         clear_folder(CHECKPOINTS_DIR, confirm=True)

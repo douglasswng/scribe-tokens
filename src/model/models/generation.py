@@ -58,7 +58,6 @@ class GenerationModel(LocalModel):
         logits_flat = pred.reshape(-1, pred.size(-1))
         target_flat = target.reshape(-1)
         mask_flat = mask.reshape(-1)
-        
         criterion = nn.CrossEntropyLoss(reduction='none')
         loss = criterion(logits_flat, target_flat)
         masked_loss = loss * mask_flat

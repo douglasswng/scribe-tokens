@@ -153,6 +153,10 @@ class DigitalInk[T: (float, int)](BaseModel):
     @classmethod
     def from_coords(cls, raw_strokes: list[list[tuple[float, float]]], to_origin: bool=True) -> 'DigitalInk[float]': ...
 
+    @overload
+    @classmethod
+    def from_coords(cls, raw_strokes: list[np.ndarray], to_origin: bool=True) -> 'DigitalInk': ...
+
     @classmethod
     def from_coords(cls, raw_strokes, to_origin: bool=True):
         strokes = []
@@ -194,9 +198,12 @@ class DigitalInk[T: (float, int)](BaseModel):
     def start(self) -> Point:
         return self.strokes[0].points[0]
 
+    def to_coords(self) -> list[list[tuple[float, float]]]:
+        return [[(point.x, point.y) for point in stroke.points] for stroke in self.strokes]
+
     def to_origin(self) -> 'DigitalInk':
-        top_left, _ = self.bbox
-        return self.shift(-top_left)
+        start = self.strokes[0].points[0]
+        return self.shift(-start)
     
     def shift(self, shift: Point) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.shift(shift) for stroke in self.strokes])

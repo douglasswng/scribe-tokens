@@ -110,6 +110,7 @@ if __name__ == "__main__":
 
     ink = Parsed.load_random().ink
     # ink = Parsed.from_path('/Users/douglasswang/Desktop/TCL/writing_beaut/ScribeTokens0728/data/parsed/iam/n09-105z-06.json').ink
+    ink = Parsed.from_path('/data/doug/ScribeTokens0728/data/parsed/iam/a10-673z-05.json').ink
     ink.visualise()
 
     #for id in TokenReprId.create_defaults():

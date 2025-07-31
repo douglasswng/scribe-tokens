@@ -32,15 +32,15 @@ CHARS = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 NUM_CHARS = len(CHARS)  # 79
 
 # Experiment hyperparameters
-VOCAB_SIZE = 25000
-DELTA = 1
-MAX_LEN = int(1e5)
+VOCAB_SIZE = 32000
+DELTA = 2
+MAX_LEN = int(1e4)
 SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
-# Model hyperparameters (aim for 10M params)
+# Model hyperparameters (aim for 10M params)  # refer to DeiT params: https://arxiv.org/pdf/2012.12877
 HIDDEN_DIM = 384
 FFN_FACTOR = 8/3  # use swiglu ffn
-NUM_LAYERS = 8
+NUM_LAYERS = 12
 NUM_HEADS = 6
 DROPOUT = 0.1
 

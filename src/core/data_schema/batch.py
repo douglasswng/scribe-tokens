@@ -36,9 +36,9 @@ class InstancePair:
 
     @property
     def _target_mask(self) -> Tensor:
-        target_mask = torch.ones_like(self._target, dtype=torch.bool)
+        target_mask = torch.zeros_like(self._target, dtype=torch.bool)
         context_len = len(self.context)
-        target_mask[context_len:] = False
+        target_mask[context_len:] = True
         return target_mask
 
 

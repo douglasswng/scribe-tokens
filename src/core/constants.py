@@ -38,7 +38,7 @@ MAX_LEN = int(1e5)
 SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
 # Model hyperparameters
-HIDDEN_DIM = 128
+HIDDEN_DIM = 256
 FFN_FACTOR = 8/3  # use swiglu ffn
 NUM_LAYERS = 6
 NUM_HEADS = 4

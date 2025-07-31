@@ -26,7 +26,7 @@ def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
     TRAIN_RATIO = 0.95
 
     set_random_seed(RANDOM_SEED)
-    parsed_paths = list(PARSED_DIR.rglob('*.json'))[:]
+    parsed_paths = list(PARSED_DIR.rglob('*.json'))[:100]
     return split_paths(parsed_paths, TRAIN_RATIO)
 
 

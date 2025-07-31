@@ -21,8 +21,14 @@ class GenerationModel(LocalModel):
         self._decoder = TransformerDecoder()
 
     def _extend_char_mask(self, input: Tensor, char_mask: Tensor) -> Tensor:
+        _, input_seq_len = input.shape
+        _, char_seq_len = char_mask.shape
+        
         extended_char_mask = torch.zeros_like(input, dtype=torch.bool)
-        extended_char_mask[char_mask] = True
+        
+        min_seq_len = min(input_seq_len, char_seq_len)
+        extended_char_mask[:, :min_seq_len] = char_mask[:, :min_seq_len]
+        
         return extended_char_mask
 
     def _forward(self, input: torch.Tensor,
@@ -36,7 +42,9 @@ class GenerationModel(LocalModel):
         repr_embedded = self._repr_embedder.embed(repr_input)
         char_embedded = self._char_embedder.embed(char_input)
 
-        assert repr_embedded == repr_embedded * repr_mask.unsqueeze(-1)  # TODO: remove this assert later
+        repr_embedded = repr_embedded * repr_mask.unsqueeze(-1)
+        char_embedded = char_embedded * char_mask.unsqueeze(-1)
+
         combined_input = repr_embedded + char_embedded
         
         output = self._decoder(combined_input)
@@ -77,7 +85,7 @@ class GenerationModel(LocalModel):
         token_indices = torch.multinomial(token_probs, 1)  # Keep shape [batch_size, 1]
         return token_indices
     
-    def _is_end(self, gen_repr: Tensor, max_len: int=10) -> bool:  # TODO: more advanced
+    def _is_end(self, gen_repr: Tensor, max_len: int=500) -> bool:  # TODO: more advanced
         seq_len = gen_repr.size(1)
         return seq_len >= max_len
     

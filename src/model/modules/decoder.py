@@ -34,8 +34,9 @@ class TransformerDecoder(nn.Module):
 
     def create_causal_mask(self, seq_len: int, device: torch.device) -> torch.Tensor:
         """Create causal (lower triangular) mask"""
-        mask = torch.tril(torch.ones(seq_len, seq_len, device=device))
-        return mask.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
+        ones = torch.ones(seq_len, seq_len, device=device)
+        causal_mask = torch.triu(ones, diagonal=1).bool()
+        return causal_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
     
     def forward(
         self, 

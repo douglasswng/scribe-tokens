@@ -1,6 +1,7 @@
 from typing import Self
 from dataclasses import dataclass, replace
 import random
+from functools import cached_property
 
 import torch
 from torch import Tensor
@@ -21,7 +22,7 @@ class InstancePair:
         char_mask[repr_len:] = True
         return char_mask
 
-    @property
+    @cached_property
     def context(self) -> Tensor:
         return torch.cat([self.ref_instance.repr, self.main_instance.char_input])
 
@@ -29,7 +30,7 @@ class InstancePair:
     def input(self) -> Tensor:
         return torch.cat([self.context, self.main_instance.repr_input])
 
-    @property
+    @cached_property
     def _target(self) -> Tensor:
         return torch.cat([self.context, self.main_instance.repr_target])
 

@@ -76,6 +76,7 @@ if __name__ == "__main__":
     import time
 
     num_workers_list = [0, 4, 16, 64, 256, 1024]
+    num_workers_list = [192]
     for model_id in ModelId.create_defaults()[:]:
         if distributed_context.is_master:
             print(f"Model: {model_id}")
@@ -89,6 +90,11 @@ if __name__ == "__main__":
                 start = time.time()
                 for batch in train_loader:
                     batch: Batch
+                    assert isinstance(batch, PairBatch)
+                    batch.input
+                    batch.char_mask
+                    batch.target
+                    batch.target_mask
                     pass  # Simulate training step
                 elapsed = time.time() - start
                 if distributed_context.is_master:

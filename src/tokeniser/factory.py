@@ -112,14 +112,13 @@ if __name__ == "__main__":
     # ink = Parsed.from_path('/Users/douglasswang/Desktop/TCL/writing_beaut/ScribeTokens0728/data/parsed/iam/n09-105z-06.json').ink
     ink = Parsed.from_path('/data/doug/ScribeTokens0728/data/parsed/iam/a10-673z-05.json').ink
     ink.visualise()
+    print(f"DigitalInk length: {len(ink)}")
 
     #for id in TokenReprId.create_defaults():
     for id in [TokenReprId.create_scribe()]:
         tokeniser = DefaultTokeniserFactory.create(id)
         tokens = tokeniser.tokenise(ink)
-
-        print(f"Tokeniser length: {len(tokens)}")
-        print(f"DigitalInk length: {len(ink)}")
+        print(f"Tokeniser length: {len(tokens)}")  
         
         ink = tokeniser.detokenise(tokens)
         ink.visualise()

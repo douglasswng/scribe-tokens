@@ -84,7 +84,15 @@ class Augmenter:
 
 
 if __name__ == "__main__":
+    from repr.factory import DefaultReprFactory
+    from core.repr import TokenReprId
+
     parsed = Parsed.load_random()
     parsed.visualise()
     augmented_parsed = Augmenter.augment(parsed)
     augmented_parsed.visualise()
+
+    repr_id = TokenReprId.create_scribe()
+    tensor = DefaultReprFactory.ink_to_tensor(repr_id, augmented_parsed.ink)
+    ink = DefaultReprFactory.tensor_to_ink(repr_id, tensor)
+    ink.visualise()

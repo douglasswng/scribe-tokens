@@ -213,12 +213,8 @@ class DigitalInk[T: (float, int)](BaseModel):
                 ax.scatter(x, y, s=0.5, c='k')
 
         count = len(list(TMP_DIR.iterdir()))
-        if name is None:
-            name = str(count)
-        else:
-            name = re.sub(r'[<>:"/\\|?*]', '_', name)
-            name = re.sub(r'[^\w\-_\.]', '_', name)[:50]
-            name = f"{count}_{name}"
+        name = str(count) if name is None else f"{count}_{name}"
+        name = name[:100]
         
         pdf_path = TMP_DIR / f'{name}.pdf'
         pdf_path.parent.mkdir(parents=True, exist_ok=True)

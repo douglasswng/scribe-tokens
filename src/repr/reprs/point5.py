@@ -7,6 +7,7 @@ from pydantic import BaseModel, field_validator
 from core.repr import Repr, VectorReprId
 from core.data_schema import DigitalInk, Stroke, Point
 from core.utils import get_stroke_point_iterator
+from core.constants import STD
 
 
 class Point5(BaseModel):
@@ -33,8 +34,8 @@ class Point5(BaseModel):
         assert torch.all((tensor[2:5] == 0.0) | (tensor[2:5] == 1.0))  # all pen states must be 0 or 1
         assert sum(tensor[2:5]) == 1.0  # exactly one pen state must be 1
 
-        return cls(dx=tensor[0].item(),
-                   dy=tensor[1].item(),
+        return cls(dx=tensor[0].item() * STD,
+                   dy=tensor[1].item() * STD,
                    pen_up=(tensor[2].item() == 1.0),
                    pen_down=(tensor[3].item() == 1.0),
                    end=(tensor[4].item() == 1.0))
@@ -45,8 +46,8 @@ class Point5(BaseModel):
     
     def to_tensor(self) -> Tensor:
         pen_state = [int(self.pen_up), int(self.pen_down), int(self.end)]
-        return torch.tensor([self.dx,
-                             self.dy,
+        return torch.tensor([self.dx / STD,
+                             self.dy / STD,
                              *pen_state],
                             dtype=torch.float32)
     

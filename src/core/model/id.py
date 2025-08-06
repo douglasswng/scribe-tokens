@@ -2,7 +2,7 @@ from typing import Self, Literal
 from enum import Enum
 from dataclasses import dataclass
 
-from core.repr import ReprId, TokenReprId
+from core.repr import ReprId, TokenReprId, VectorReprId
 
 
 class Task(Enum):
@@ -12,6 +12,18 @@ class Task(Enum):
     RECOGNITION_SFT = 'recognition_sft'
     GENERATION_SFT = 'generation_sft'
 
+    @property
+    def is_recognition(self) -> bool:
+        return self in [Task.RECOGNITION, Task.RECOGNITION_SFT]
+    
+    @property
+    def is_generation(self) -> bool:
+        return self in [Task.GENERATION, Task.GENERATION_SFT, Task.PRETRAINING_NTP]
+
+    @property
+    def is_pretraining(self) -> bool:
+        return self == Task.PRETRAINING_NTP
+
 
 @dataclass(frozen=True)
 class ModelId:
@@ -20,6 +32,25 @@ class ModelId:
 
     def __str__(self) -> str:
         return f"Task: {self.task.value}, Repr: {self.repr_id}"
+
+    @classmethod
+    def _get_vector_repr_id(cls, task: Task) -> ReprId:
+        if task.is_recognition:
+            return VectorReprId.create_point3()
+        elif task.is_generation:
+            return VectorReprId.create_point5()
+        else:
+            raise ValueError(f"Invalid task: {task}")
+    
+    @classmethod
+    def _get_repr_ids(cls, task: Task) -> list[ReprId]:
+        token_repr_ids = TokenReprId.create_defaults()
+        vector_repr_id = cls._get_vector_repr_id(task)
+        return token_repr_ids + [vector_repr_id]
+    
+    @classmethod
+    def create_task_model_ids(cls, task: Task) -> list[Self]:
+        return [cls(task=task, repr_id=repr_id) for repr_id in cls._get_repr_ids(task)]
     
     @classmethod
     def create_task_defaults(cls, task: Task) -> list[Self]:
@@ -29,27 +60,28 @@ class ModelId:
     def create_defaults(cls) -> list[Self]:
         model_ids = []
         for task in Task:
-            model_id = cls(task=task, repr_id=TokenReprId.create_scribe())
-            model_ids.append(model_id)
+            model_ids.extend(cls.create_task_model_ids(task))
         return model_ids
     
     @property
     def context_type(self) -> Literal['repr', 'char', None]:
-        match self.task:
-            case Task.RECOGNITION | Task.RECOGNITION_SFT:
-                return 'repr'
-            case Task.GENERATION | Task.GENERATION_SFT:
-                return 'char'
-            case Task.PRETRAINING_NTP:
-                return None
+        if self.task.is_pretraining:
+            return None
+        elif self.task.is_recognition:
+            return 'repr'
+        elif self.task.is_generation:
+            return 'char'
+        else:
+            raise ValueError(f"Invalid task: {self.task}")
     
     @property
     def main_type(self) -> Literal['repr', 'char']:
-        match self.task:
-            case Task.RECOGNITION | Task.RECOGNITION_SFT:
-                return 'char'
-            case Task.GENERATION | Task.GENERATION_SFT | Task.PRETRAINING_NTP:
-                return 'repr'
+        if self.task.is_recognition:
+            return 'char'
+        elif self.task.is_generation:
+            return 'repr'
+        else:
+            raise ValueError(f"Invalid task: {self.task}")
     
 if __name__ == "__main__":
     for model_id in ModelId.create_defaults():

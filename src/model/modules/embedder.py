@@ -2,8 +2,12 @@ from abc import ABC, abstractmethod
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch import Tensor
-from core.constants import HIDDEN_DIM, NUM_CHARS, DROPOUT, VOCAB_SIZE
+from core.constants import HIDDEN_DIM, NUM_CHARS, DROPOUT, VOCAB_SIZE, NUM_MIXTURES
+
+
+type MDNOutput = tuple[Tensor, Tensor, Tensor, Tensor, Tensor]  # (mixtures, means, stds, rhos, pen_states)
 
 
 class Embedder(nn.Module, ABC):
@@ -11,7 +15,39 @@ class Embedder(nn.Module, ABC):
     def embed(self, x: Tensor) -> Tensor: ...
 
     @abstractmethod
-    def unembed(self, x: Tensor) -> Tensor: ...
+    def unembed(self, x: Tensor) -> Tensor | MDNOutput: ...
+
+
+class VectorEmbedder(Embedder):
+    def __init__(self, input_dim: int):
+        super().__init__()
+        self._embedding = nn.Linear(input_dim, HIDDEN_DIM)
+        
+        self._mixture_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES)
+        self._mean_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES * 2)
+        self._std_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES * 2)
+        self._rho_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES)
+        self._pen_state_proj = nn.Linear(HIDDEN_DIM, 3)
+
+        self._dropout = nn.Dropout(DROPOUT)
+
+    def embed(self, x: Tensor) -> Tensor:
+        x = self._embedding(x)
+        return self._dropout(x)
+    
+    def unembed(self, x: Tensor) -> MDNOutput:
+        mixtures = self._mixture_proj(x)
+        means = self._mean_proj(x)
+        stds = self._std_proj(x)
+        rhos = self._rho_proj(x)
+        pen_states = self._pen_state_proj(x)
+
+        mixtures = torch.softmax(mixtures, dim=-1)
+        means = means.view(*means.size()[:-1], NUM_MIXTURES, 2)
+        stds = F.softplus(stds.view(*stds.size()[:-1], NUM_MIXTURES, 2)) + 1e-3
+        rhos = torch.tanh(rhos) * 0.99
+
+        return mixtures, means, stds, rhos, pen_states
 
 
 class TokenEmbedder(Embedder):

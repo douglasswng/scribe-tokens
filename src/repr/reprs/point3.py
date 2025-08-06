@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from core.repr import Repr, VectorReprId
 from core.data_schema import DigitalInk, Stroke, Point
 from core.utils import get_stroke_point_iterator
+from core.constants import STD
 
 
 class Point3(BaseModel):
@@ -22,13 +23,13 @@ class Point3(BaseModel):
         assert tensor.shape == (3,)
         assert tensor[2].item() in {0.0, 1.0}
 
-        return cls(dx=tensor[0].item(),
-                   dy=tensor[1].item(),
+        return cls(dx=tensor[0].item() * STD,
+                   dy=tensor[1].item() * STD,
                    pen_up=tensor[2].item() == 1.0)
     
     def to_tensor(self) -> Tensor:
-        return torch.tensor([self.dx,
-                             self.dy,
+        return torch.tensor([self.dx / STD,
+                             self.dy / STD,
                              int(self.pen_up)],
                             dtype=torch.float32)
 

@@ -5,7 +5,7 @@ from torch import Tensor
 import torch.nn as nn
 
 from core.model import LocalModel, ModelId
-from core.data_schema import Batch, DigitalInk, PairBatch, InstancePair
+from core.data_schema import Batch, DigitalInk
 from repr.factory import DefaultReprFactory
 from model.modules.embedder import Embedder, CharEmbedder, TokenEmbedder
 from model.modules.decoder import TransformerDecoder

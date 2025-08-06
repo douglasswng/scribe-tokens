@@ -47,6 +47,7 @@ NUM_MIXTURES = 20
 STD = 50  # the approximate std of the dx and dy values in the dataset
 
 # Training hyperparameters
+UNKNOWN_TOKEN_RATE = 0.002  # match the unknown rate on the validation set
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
 NUM_EPOCHS = 200

@@ -57,23 +57,18 @@ class TransformerDecoder(nn.Module):
         x = self.norm(x)
         return x
 
-    def ce_loss(self,
-                pred: Tensor,
-                target: Tensor,
-                mask: Tensor) -> Tensor:
+    def ce_loss(self, pred: Tensor, target: Tensor, mask: Tensor) -> Tensor:
         logits_flat = pred.reshape(-1, pred.size(-1))
         target_flat = target.reshape(-1)
         mask_flat = mask.reshape(-1)
-        criterion = nn.CrossEntropyLoss(reduction='none')
-        loss: Tensor = criterion(logits_flat, target_flat)
-        masked_loss = loss * mask_flat
-        return masked_loss.sum() / mask_flat.sum()
+        
+        valid_mask = mask_flat.bool()
+        valid_logits = logits_flat[valid_mask]
+        valid_targets = target_flat[valid_mask]
 
-    def next_logits(self,
-                    x: Tensor,
-                    start_pos: int = 0) -> Tensor:
-        pred = self(x, start_pos)
-        return pred[:, -1, :]
+        criterion = nn.CrossEntropyLoss(reduction='none')
+        loss = criterion(valid_logits, valid_targets)
+        return loss.mean()
 
     def pad_tensors(self, tensors: list[Tensor]) -> Tensor:
         return pad_sequence(tensors, batch_first=True, padding_value=0)

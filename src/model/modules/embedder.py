@@ -80,8 +80,8 @@ class TokenEmbedder(Embedder):
 class CharEmbedder(Embedder):
     def __init__(self):
         super().__init__()
-        self._embedding = nn.Embedding(NUM_CHARS+3, HIDDEN_DIM, padding_idx=0)  # +2 for pad, bos, eos
-        self._unembedding = nn.Linear(HIDDEN_DIM, NUM_CHARS+1) # +1 for blank
+        self._embedding = nn.Embedding(NUM_CHARS+3, HIDDEN_DIM, padding_idx=0)  # +3 for pad, bos, eos
+        self._unembedding = nn.Linear(HIDDEN_DIM, NUM_CHARS+3)
         self._dropout = nn.Dropout(DROPOUT)
 
     def embed(self, x: Tensor) -> Tensor:

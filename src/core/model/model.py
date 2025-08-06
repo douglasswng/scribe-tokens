@@ -41,13 +41,15 @@ class LocalModel(ModelMixin, nn.Module):
     @property
     def num_embedding_params(self) -> int:
         return VOCAB_SIZE * HIDDEN_DIM
+
+    @property
+    def device(self) -> torch.device:
+        return next(self.parameters()).device
     
     def init_weights(self):
         for module in self.modules():
             match module:
-                case nn.Linear():
-                    torch.nn.init.normal_(module.weight, std=0.02)
-                case nn.Embedding():
+                case nn.Linear() | nn.Embedding():
                     torch.nn.init.normal_(module.weight, std=0.02)
                 case nn.RMSNorm():
                     torch.nn.init.ones_(module.weight)

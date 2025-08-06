@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from torch import Tensor
+from torch.nn.utils.rnn import pad_sequence
 
 from model.modules.decoder_layer import TransformerDecoderLayer
 from core.constants import HIDDEN_DIM, NUM_HEADS, FFN_FACTOR, DROPOUT, NUM_LAYERS, MAX_LEN
@@ -32,7 +34,7 @@ class TransformerDecoder(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def create_causal_mask(self, seq_len: int, device: torch.device) -> torch.Tensor:
+    def create_causal_mask(self, seq_len: int, device: torch.device) -> Tensor:
         """Create causal (lower triangular) mask"""
         ones = torch.ones(seq_len, seq_len, device=device)
         causal_mask = torch.triu(ones, diagonal=1).bool()
@@ -40,9 +42,9 @@ class TransformerDecoder(nn.Module):
     
     def forward(
         self, 
-        x: torch.Tensor, 
+        x: Tensor, 
         start_pos: int = 0
-    ) -> torch.Tensor:
+    ) -> Tensor:
         # Create causal mask
         seq_len = x.shape[1]
         mask = self.create_causal_mask(seq_len, x.device)
@@ -54,6 +56,27 @@ class TransformerDecoder(nn.Module):
         # Final layer norm 
         x = self.norm(x)
         return x
+
+    def ce_loss(self,
+                pred: Tensor,
+                target: Tensor,
+                mask: Tensor) -> Tensor:
+        logits_flat = pred.reshape(-1, pred.size(-1))
+        target_flat = target.reshape(-1)
+        mask_flat = mask.reshape(-1)
+        criterion = nn.CrossEntropyLoss(reduction='none')
+        loss: Tensor = criterion(logits_flat, target_flat)
+        masked_loss = loss * mask_flat
+        return masked_loss.sum() / mask_flat.sum()
+
+    def next_logits(self,
+                    x: Tensor,
+                    start_pos: int = 0) -> Tensor:
+        pred = self(x, start_pos)
+        return pred[:, -1, :]
+
+    def pad_tensors(self, tensors: list[Tensor]) -> Tensor:
+        return pad_sequence(tensors, batch_first=True, padding_value=0)
 
 
 if __name__ == "__main__":

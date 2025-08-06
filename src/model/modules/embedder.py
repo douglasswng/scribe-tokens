@@ -7,12 +7,15 @@ from torch import Tensor
 from core.constants import HIDDEN_DIM, NUM_CHARS, DROPOUT, VOCAB_SIZE, NUM_MIXTURES
 
 
+type MDNOutput = tuple[Tensor, Tensor, Tensor, Tensor, Tensor]  # (mixtures, means, stds, rhos, pen_states)
+
+
 class Embedder(nn.Module, ABC):
     @abstractmethod
     def embed(self, x: Tensor) -> Tensor: ...
 
     @abstractmethod
-    def unembed(self, x: Tensor) -> Tensor: ...
+    def unembed(self, x: Tensor) -> Tensor | MDNOutput: ...
 
 
 class VectorEmbedder(Embedder):
@@ -32,7 +35,7 @@ class VectorEmbedder(Embedder):
         x = self._embedding(x)
         return self._dropout(x)
     
-    def unembed(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    def unembed(self, x: Tensor) -> MDNOutput:
         mixtures = self._mixture_proj(x)
         means = self._mean_proj(x)
         stds = self._std_proj(x)

@@ -3,7 +3,7 @@ from functools import partial
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 
-from core.data_schema import Batch, Instance, PairBatch, InstancePair, SingletonBatch
+from core.data_schema import Batch, Instance
 from core.model import ModelId
 from core.utils import distributed_context
 from dataloader.dataset import create_datasets
@@ -11,14 +11,8 @@ from dataloader.split import create_datasplit
 from core.constants import BATCH_SIZE
 
 
-def collate_fn(instances: list[tuple[Instance, Instance | None]]) -> Batch:
-    main_instances, ref_instances = zip(*instances)
-    if any(ref is None for ref in ref_instances):
-        return SingletonBatch(datapoints=list(main_instances))
-    
-    instance_pairs = [InstancePair(main_instance=main, ref_instance=ref)
-                      for main, ref in zip(main_instances, ref_instances)]
-    return PairBatch(datapoints=instance_pairs)
+def collate_fn(instances: list[Instance]) -> Batch:
+    return Batch(instances=instances)
 
 
 def create_dataloader(dataset: Dataset,
@@ -90,7 +84,6 @@ if __name__ == "__main__":
                 start = time.time()
                 for batch in train_loader:
                     batch: Batch
-                    assert isinstance(batch, PairBatch)
                     batch.input.shape
                     batch.char_mask.shape
                     batch.target.shape

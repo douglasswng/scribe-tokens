@@ -43,6 +43,8 @@ FFN_FACTOR = 8/3  # use swiglu ffn
 NUM_LAYERS = 12
 NUM_HEADS = 6
 DROPOUT = 0.1
+NUM_MIXTURES = 20
+STD = 50  # the approximate std of the dx and dy values in the dataset
 
 # Training hyperparameters
 BATCH_SIZE = 32

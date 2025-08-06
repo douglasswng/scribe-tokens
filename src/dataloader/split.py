@@ -31,7 +31,7 @@ def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
     TRAIN_RATIO = 0.95
 
     set_random_seed(RANDOM_SEED)
-    parsed_paths = list(PARSED_DIR.rglob('*.json'))[:]
+    parsed_paths = list(PARSED_DIR.rglob('*.json'))[:100]
     valid_paths = [path for path in parsed_paths if path.stem not in get_blacklist()]
     return split_paths(valid_paths, TRAIN_RATIO)
 

@@ -34,7 +34,7 @@ class ParsedDataset(Dataset):
     
     def _to_instance(self, parsed: Parsed) -> Instance:
         repr = self._repr_callable(parsed.ink)
-        return self._instance_callable(parsed=parsed, _repr=repr)
+        return self._instance_callable(parsed=parsed, _repr_tensor=repr)
     
     def _get_instance(self, parsed: Parsed) -> Instance:
         if self._augment:

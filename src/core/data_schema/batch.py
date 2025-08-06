@@ -29,6 +29,11 @@ class Batch:
         char_masks = [instance.char_mask for instance in self.instances]
         return self._pad_sequence(char_masks)
 
+    @property
+    def target_mask(self) -> Tensor:
+        target_masks = [instance.target_mask for instance in self.instances]
+        return self._pad_sequence(target_masks)
+
     def get_sample(self, idx: int) -> Self:
         return replace(self, instances=[self.instances[idx]])
 

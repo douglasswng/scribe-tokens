@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Ink Web Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .canvas-container {
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        #drawingCanvas {
+            background-color: white;
+            cursor: crosshair;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .enhance-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .enhance-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .enhance-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .clear-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .clear-btn:hover {
+            background-color: #c82333;
+        }
+        
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.loading {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Digital Ink Enhancement Demo</h1>
+        
+        <div class="canvas-container">
+            <canvas id="drawingCanvas" width="1600" height="600"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="enhanceBtn" class="enhance-btn">Enhance Strokes</button>
+            <button id="clearBtn" class="clear-btn">Clear Canvas</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        class DrawingCanvas {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.isDrawing = false;
+                this.currentStroke = [];
+                this.strokes = [];
+                
+                this.setupEventListeners();
+                this.setupCanvas();
+            }
+            
+            setupCanvas() {
+                this.ctx.lineWidth = 2;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+            }
+            
+            setupEventListeners() {
+                // Mouse events
+                this.canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
+                this.canvas.addEventListener('mousemove', (e) => this.draw(e));
+                this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+                this.canvas.addEventListener('mouseout', () => this.stopDrawing());
+                
+                // Touch events for mobile
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+                
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+                
+                this.canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    const mouseEvent = new MouseEvent('mouseup', {});
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+            }
+            
+            getMousePos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+            
+            startDrawing(e) {
+                this.isDrawing = true;
+                const pos = this.getMousePos(e);
+                this.currentStroke = [pos];
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(pos.x, pos.y);
+            }
+            
+            draw(e) {
+                if (!this.isDrawing) return;
+                
+                const pos = this.getMousePos(e);
+                this.currentStroke.push(pos);
+                
+                this.ctx.lineTo(pos.x, pos.y);
+                this.ctx.stroke();
+            }
+            
+            stopDrawing() {
+                if (!this.isDrawing) return;
+                
+                this.isDrawing = false;
+                if (this.currentStroke.length > 1) {
+                    // Convert to coordinate tuples for DigitalInk
+                    const strokeCoords = this.currentStroke.map(p => [p.x, p.y]);
+                    this.strokes.push(strokeCoords);
+                }
+                this.currentStroke = [];
+            }
+            
+            clear() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.strokes = [];
+                this.currentStroke = [];
+                this.isDrawing = false;
+            }
+            
+            renderDigitalInk(digitalInkData) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Render enhanced strokes in blue
+                this.ctx.strokeStyle = '#007bff';
+                this.ctx.lineWidth = 2;
+                
+                for (const stroke of digitalInkData.strokes) {
+                    if (stroke.points.length > 1) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                        
+                        for (let i = 1; i < stroke.points.length; i++) {
+                            this.ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                        }
+                        
+                        this.ctx.stroke();
+                    }
+                }
+                
+                // Update internal strokes to match enhanced version
+                this.strokes = digitalInkData.strokes.map(stroke => 
+                    stroke.points.map(point => [point.x, point.y])
+                );
+            }
+            
+            getStrokes() {
+                return this.strokes;
+            }
+        }
+        
+        class StatusManager {
+            constructor(statusElementId) {
+                this.statusElement = document.getElementById(statusElementId);
+            }
+            
+            show(message, type = 'success') {
+                this.statusElement.textContent = message;
+                this.statusElement.className = `status ${type}`;
+                this.statusElement.style.display = 'block';
+                
+                if (type !== 'loading') {
+                    setTimeout(() => this.hide(), 3000);
+                }
+            }
+            
+            hide() {
+                this.statusElement.style.display = 'none';
+            }
+        }
+        
+        // Initialize the application
+        const drawingCanvas = new DrawingCanvas('drawingCanvas');
+        const statusManager = new StatusManager('status');
+        
+        const enhanceBtn = document.getElementById('enhanceBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        enhanceBtn.addEventListener('click', async () => {
+            const strokes = drawingCanvas.getStrokes();
+            
+            if (strokes.length === 0) {
+                statusManager.show('Please draw something first!', 'error');
+                return;
+            }
+
+            // Prompt user for text input
+            const text = prompt('Enter the text that corresponds to your handwriting:');
+            
+            // Check if user cancelled or entered empty text
+            if (text === null) {
+                return; // User cancelled
+            }
+
+            if (text.trim() === '') {
+                statusManager.show('Please enter some text to guide the enhancement!', 'error');
+                return;
+            }
+            
+            enhanceBtn.disabled = true;
+            statusManager.show('Enhancing strokes...', 'loading');
+            
+            try {
+                const response = await fetch('/enhance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ strokes: strokes, text: text })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    drawingCanvas.renderDigitalInk(result.enhanced_ink);
+                    statusManager.show('Strokes enhanced successfully!', 'success');
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
+                }
+                
+            } catch (error) {
+                console.error('Enhancement failed:', error);
+                statusManager.show(`Enhancement failed: ${error.message}`, 'error');
+            } finally {
+                enhanceBtn.disabled = false;
+            }
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            drawingCanvas.clear();
+            statusManager.hide();
+        });
+        
+        // Show initial instructions
+        statusManager.show('Draw on the canvas and click "Enhance Strokes" to see the enhancement!', 'success');
+    </script>
+</body>
+</html> 

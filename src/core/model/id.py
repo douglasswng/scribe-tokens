@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Self, Literal
 from enum import Enum
 from dataclasses import dataclass
 
@@ -6,10 +6,11 @@ from core.repr import ReprId, TokenReprId
 
 
 class Task(Enum):
+    RECOGNITION = 'recognition'
     GENERATION = 'generation'
-    # PRETRAINING = 'pretraining'
-    # RECOGNITION_SFT = 'recognition_sft'
-    # POSTTRAINING = 'posttraining'
+    PRETRAINING_NTP = 'pretraining_ntp'
+    RECOGNITION_SFT = 'recognition_sft'
+    GENERATION_SFT = 'generation_sft'
 
 
 @dataclass(frozen=True)
@@ -33,12 +34,22 @@ class ModelId:
         return model_ids
     
     @property
-    def use_reference(self) -> bool:
-        if self.task == Task.GENERATION:
-            return True
-        else:
-            return False
-        
+    def context_type(self) -> Literal['repr', 'char', None]:
+        match self.task:
+            case Task.RECOGNITION | Task.RECOGNITION_SFT:
+                return 'repr'
+            case Task.GENERATION | Task.GENERATION_SFT:
+                return 'char'
+            case Task.PRETRAINING_NTP:
+                return None
+    
+    @property
+    def main_type(self) -> Literal['repr', 'char']:
+        match self.task:
+            case Task.RECOGNITION | Task.RECOGNITION_SFT:
+                return 'char'
+            case Task.GENERATION | Task.GENERATION_SFT | Task.PRETRAINING_NTP:
+                return 'repr'
     
 if __name__ == "__main__":
     for model_id in ModelId.create_defaults():

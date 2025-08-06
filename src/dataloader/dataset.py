@@ -6,7 +6,6 @@ from functools import partial
 from torch.utils.data import Dataset
 
 from core.data_schema import Parsed, Instance
-from core.repr.id import ReprId
 from core.model import ModelId
 from repr.factory import DefaultReprFactory
 from dataloader.augmenter import Augmenter
@@ -15,15 +14,14 @@ from dataloader.split import DataSplit
 
 class ParsedDataset(Dataset):
     def __init__(self,
-                 repr_id: ReprId,
+                 model_id: ModelId,
                  parsed_paths: list[Path],
-                 augment: bool,
-                 use_reference: bool):
+                 augment: bool):
         self._parsed_paths = parsed_paths
         self._augment = augment
-        self._use_reference = use_reference
 
-        self._repr_callable = partial(DefaultReprFactory.ink_to_tensor, repr_id)
+        self._repr_callable = partial(DefaultReprFactory.ink_to_tensor, model_id.repr_id)
+        self._instance_callable = partial(Instance, context_type=model_id.context_type, main_type=model_id.main_type)
         self._writer_idxs = self._build_writer_idxs()  # for reference
         self._parsed_to_instance: dict[str, Instance] = {}  # for caching
 
@@ -58,28 +56,19 @@ class ParsedDataset(Dataset):
             self._parsed_to_instance[parsed.id] = instance
         return self._parsed_to_instance[parsed.id]
     
-    def __getitem__(self, idx: int) -> tuple[Instance, Instance | None]:
+    def __getitem__(self, idx: int) -> Instance:
         if self._augment:
             Augmenter.reset_config()
 
-        main_parsed = self._get_parsed(idx)
-        main_instance = self._get_instance(main_parsed)
-        if not self._use_reference:
-            return main_instance, None
-
-        valid_idxs = self._writer_idxs[main_parsed.writer]
-        valid_idxs = valid_idxs if valid_idxs else {idx}
-        reference_idx = random.choice(list(valid_idxs))
-        reference_parsed = self._get_parsed(reference_idx)
-        reference_instance = self._get_instance(reference_parsed)
-        return main_instance, reference_instance
+        parsed = self._get_parsed(idx)
+        instance = self._get_instance(parsed)
+        return instance
     
 
 def create_datasets(model_id: ModelId, datasplit: DataSplit
                     ) -> tuple[ParsedDataset, ParsedDataset, ParsedDataset]:
     partial_parsed_dataset = partial(ParsedDataset,
-                                     repr_id=model_id.repr_id,
-                                     use_reference=model_id.use_reference)
+                                     model_id=model_id)
     
     train_paths, val_paths, test_paths = datasplit.get_splits()
     train_dataset = partial_parsed_dataset(parsed_paths=train_paths, augment=True)

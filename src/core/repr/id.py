@@ -22,6 +22,9 @@ class ReprId(Protocol):
     def is_vector(self) -> bool: ...
 
     @property
+    def has_oov(self) -> bool: ...
+
+    @property
     def is_token(self) -> bool:
         return not self.is_vector
     
@@ -57,6 +60,10 @@ class VectorReprId(ReprId):
     @property
     def is_vector(self) -> bool:
         return True
+
+    @property
+    def has_oov(self) -> bool:
+        return False
     
 
 class TokenReprType(Enum):
@@ -117,3 +124,7 @@ class TokenReprId(ReprId):
     @property
     def is_scribe(self) -> bool:
         return self.type == TokenReprType.SCRIBE
+
+    @property
+    def has_oov(self) -> bool:
+        return self.type in {TokenReprType.REL, TokenReprType.ABS}

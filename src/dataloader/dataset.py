@@ -19,7 +19,6 @@ class ParsedDataset(Dataset):
         self._augment = augment
 
         self._repr_callable = partial(DefaultReprFactory.ink_to_tensor, model_id.repr_id)
-        self._instance_callable = partial(Instance, context_type=model_id.context_type, main_type=model_id.main_type)
         self._parsed_to_instance: dict[str, Instance] = {}  # for caching when no need to augment
 
     def __len__(self) -> int:
@@ -34,7 +33,7 @@ class ParsedDataset(Dataset):
     
     def _to_instance(self, parsed: Parsed) -> Instance:
         repr = self._repr_callable(parsed.ink)
-        return self._instance_callable(parsed=parsed, _repr_tensor=repr)
+        return Instance(parsed=parsed, _repr_tensor=repr)
     
     def _get_instance(self, parsed: Parsed) -> Instance:
         if self._augment:

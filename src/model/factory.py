@@ -1,4 +1,5 @@
 from core.model import ModelFactory, ModelId, Task, LocalModel
+from tokeniser.factory import DefaultTokeniserFactory
 from model.models.recognition import RecognitionModel
 from model.modules.embedder import Embedder, TokenEmbedder, VectorEmbedder
 from core.utils.distributed_context import distributed_context
@@ -8,7 +9,12 @@ class ReprEmbedderFactory:
     @classmethod
     def create(cls, model_id: ModelId) -> Embedder:
         if model_id.repr_id.is_token:
-            return TokenEmbedder()
+            if not model_id.repr_id.has_oov:
+                unk_token_id = None
+            else:
+                tokeniser = DefaultTokeniserFactory.create(model_id.repr_id)
+                unk_token_id = tokeniser.unk_token_id
+            return TokenEmbedder(unk_token_id)
 
         if model_id.task.is_generation:
             return VectorEmbedder(input_dim=5)

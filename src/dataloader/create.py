@@ -84,10 +84,6 @@ if __name__ == "__main__":
                 start = time.time()
                 for batch in train_loader:
                     batch: Batch
-                    batch.input.shape
-                    batch.char_mask.shape
-                    batch.target.shape
-                    batch.target_mask.shape
                     pass  # Simulate training step
                 elapsed = time.time() - start
                 if distributed_context.is_master:

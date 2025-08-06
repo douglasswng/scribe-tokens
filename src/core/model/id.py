@@ -62,26 +62,7 @@ class ModelId:
         for task in Task:
             model_ids.extend(cls.create_task_model_ids(task))
         return model_ids
-    
-    @property
-    def context_type(self) -> Literal['repr', 'char', None]:
-        if self.task.is_pretraining:
-            return None
-        elif self.task.is_recognition:
-            return 'repr'
-        elif self.task.is_generation:
-            return 'char'
-        else:
-            raise ValueError(f"Invalid task: {self.task}")
-    
-    @property
-    def main_type(self) -> Literal['repr', 'char']:
-        if self.task.is_recognition:
-            return 'char'
-        elif self.task.is_generation:
-            return 'repr'
-        else:
-            raise ValueError(f"Invalid task: {self.task}")
+        
     
 if __name__ == "__main__":
     for model_id in ModelId.create_defaults():

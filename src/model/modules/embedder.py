@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-from core.constants import HIDDEN_DIM, NUM_CHARS, DROPOUT, VOCAB_SIZE, NUM_MIXTURES
+from core.constants import HIDDEN_DIM, NUM_CHARS, DROPOUT, VOCAB_SIZE, NUM_MIXTURES, UNKNOWN_TOKEN_RATE
 
 
 type MDNOutput = tuple[Tensor, Tensor, Tensor, Tensor, Tensor]  # (mixtures, means, stds, rhos, pen_states)
@@ -51,12 +51,25 @@ class VectorEmbedder(Embedder):
 
 
 class TokenEmbedder(Embedder):
-    def __init__(self):
+    def __init__(self, unk_token_id: int | None):
         super().__init__()
+        self._unk_token_id = unk_token_id
+
         self._embedding = nn.Embedding(VOCAB_SIZE+1, HIDDEN_DIM, padding_idx=0)
         self._dropout = nn.Dropout(DROPOUT)
 
+    def _add_unk_token(self, x: Tensor) -> Tensor:
+        assert self._unk_token_id is not None
+
+        shape = x.size(0) if x.dim() == 1 else (x.size(0), x.size(1))
+        dropout_mask = torch.rand(shape) < UNKNOWN_TOKEN_RATE
+        dropout_mask = dropout_mask.to(x.device)
+        x = x.masked_fill(dropout_mask, self._unk_token_id)
+        return x
+
     def embed(self, x: Tensor) -> Tensor:
+        if self._unk_token_id is not None and self.training:
+            x = self._add_unk_token(x)
         x = self._embedding(x)
         return self._dropout(x)
     
@@ -68,8 +81,8 @@ class TokenEmbedder(Embedder):
 class CharEmbedder(Embedder):
     def __init__(self):
         super().__init__()
-        self._embedding = nn.Embedding(NUM_CHARS+3, HIDDEN_DIM, padding_idx=0)  # +2 for pad, bos, eos
-        self._unembedding = nn.Linear(HIDDEN_DIM, NUM_CHARS+1) # +1 for blank
+        self._embedding = nn.Embedding(NUM_CHARS+3, HIDDEN_DIM, padding_idx=0)  # +3 for pad, bos, eos
+        self._unembedding = nn.Linear(HIDDEN_DIM, NUM_CHARS+3)
         self._dropout = nn.Dropout(DROPOUT)
 
     def embed(self, x: Tensor) -> Tensor:

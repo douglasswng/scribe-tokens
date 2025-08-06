@@ -47,7 +47,7 @@ DROPOUT = 0.1
 # Training hyperparameters
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 200
 PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs
 WEIGHT_DECAY = 0.1
 

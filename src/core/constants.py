@@ -22,9 +22,6 @@ TRACKERS_DIR = ARTIFACTS_DIR / "trackers"
 METRICS_DIR = ARTIFACTS_DIR / "metrics"
 
 # Dataset statistics
-WRITERS = list([str(id) for id in range(10027, 10222)])
-NUM_WRITERS = len(WRITERS)  # 195
-
 CHARS = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
          + "abcdefghijklmnopqrstuvwxyz"
          + "0123456789"

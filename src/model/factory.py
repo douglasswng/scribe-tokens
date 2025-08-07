@@ -1,3 +1,4 @@
+from core.repr import ReprId, VectorReprId
 from core.model import ModelFactory, ModelId, Task, LocalModel
 from tokeniser.factory import DefaultTokeniserFactory
 from model.models.recognition import RecognitionModel
@@ -9,27 +10,23 @@ from core.utils.distributed_context import distributed_context
 
 class ReprEmbedderFactory:
     @classmethod
-    def create(cls, model_id: ModelId) -> Embedder:
-        if model_id.repr_id.is_token:
-            if not model_id.repr_id.has_oov:
+    def create(cls, repr_id: ReprId) -> Embedder:
+        if repr_id.is_token:
+            if not repr_id.has_oov:
                 unk_token_id = None
             else:
-                tokeniser = DefaultTokeniserFactory.create(model_id.repr_id)
+                tokeniser = DefaultTokeniserFactory.create(repr_id)
                 unk_token_id = tokeniser.unk_token_id
             return TokenEmbedder(unk_token_id)
 
-        if model_id.task.is_generation:
-            return VectorEmbedder(input_dim=5)
-        elif model_id.task.is_recognition:
-            return VectorEmbedder(input_dim=3)
-        else:
-            raise ValueError(f"Unknown model id: {model_id}")
+        assert isinstance(repr_id, VectorReprId)
+        return VectorEmbedder(input_dim=repr_id.dim)
 
 
 class DefaultModelFactory(ModelFactory):
     @classmethod
     def create_local(cls, model_id: ModelId) -> LocalModel:
-        repr_embedder = ReprEmbedderFactory.create(model_id)
+        repr_embedder = ReprEmbedderFactory.create(model_id.repr_id)
         match model_id.task:
             case Task.RECOGNITION:
                 local_model = RecognitionModel(model_id=model_id, repr_embedder=repr_embedder)
@@ -49,7 +46,7 @@ class DefaultModelFactory(ModelFactory):
     @classmethod
     def _load_pretraining_model(cls, model_id: ModelId) -> PretrainingModel:
         pretrain_model_id = ModelId(task=Task.PRETRAINING_NTP, repr_id=model_id.repr_id)
-        pretrain_model = cls.load_pretrained(pretrain_model_id)
+        pretrain_model = cls.load_pretrained(pretrain_model_id).local_model
         assert isinstance(pretrain_model, PretrainingModel)
         return pretrain_model
 
@@ -57,19 +54,20 @@ class DefaultModelFactory(ModelFactory):
     def _create_recog_sft(cls, model_id: ModelId) -> LocalModel:
         pretrain_model = cls._load_pretraining_model(model_id)
         base_model_id = ModelId(task=Task.RECOGNITION, repr_id=model_id.repr_id)
-        local_model = RecognitionModel(model_id=base_model_id,
+        recog_model = RecognitionModel(model_id=base_model_id,
                                        repr_embedder=pretrain_model.repr_embedder,
                                        decoder=pretrain_model.decoder)
-        return local_model
+        return recog_model
 
     @classmethod
     def _create_gen_sft(cls, model_id: ModelId) -> LocalModel:
         pretrain_model = cls._load_pretraining_model(model_id)
         base_model_id = ModelId(task=Task.GENERATION, repr_id=model_id.repr_id)
-        local_model = GenerationModel(model_id=base_model_id,
-                                      repr_embedder=pretrain_model.repr_embedder,
-                                      decoder=pretrain_model.decoder)
-        return local_model
+        gen_model = GenerationModel(model_id=base_model_id,
+                                    repr_embedder=pretrain_model.repr_embedder,
+                                    decoder=pretrain_model.decoder)
+        return gen_model
+
 
 if __name__ == "__main__":
     for model_id in ModelId.create_defaults():

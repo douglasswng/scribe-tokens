@@ -1,4 +1,4 @@
-from core.constants import WRITERS, CHARS, NUM_CHARS
+from core.constants import CHARS, NUM_CHARS
 
 
 class IdMapper:

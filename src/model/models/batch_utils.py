@@ -1,5 +1,6 @@
 import torch
 from torch import Tensor
+from torch._prims_common import is_integer_dtype
 from torch.nn.utils.rnn import pad_sequence
 
 from core.data_schema import Batch
@@ -16,44 +17,63 @@ class BatchPreper:
         return next(self._repr_embedder.parameters()).device
 
     def prepare_recog_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
-        ink_repr_embeddings = [self._repr_embedder.embed(instance.repr) for instance in batch.instances]
-        char_input_embeddings = [self._char_embedder.embed(instance.char_input) for instance in batch.instances]
-        recognition_inputs = [torch.cat([ink_emb, char_emb], dim=0) 
-                             for ink_emb, char_emb in zip(ink_repr_embeddings, char_input_embeddings)]
-
-        ink_repr_targets = [instance.repr for instance in batch.instances]
-        char_prediction_targets = [instance.char_target for instance in batch.instances]
-        recognition_targets = [torch.cat([ink_tgt, char_tgt], dim=0) 
-                              for ink_tgt, char_tgt in zip(ink_repr_targets, char_prediction_targets)]
-
-        ink_reconstruction_masks = [torch.zeros(ink_emb.shape[0]) for ink_emb in ink_repr_embeddings]
-        char_prediction_masks = [torch.ones(char_tgt.shape[0]) for char_tgt in char_prediction_targets]
-        recognition_loss_masks = [torch.cat([ink_mask, char_mask], dim=0)
-                                 for ink_mask, char_mask in zip(ink_reconstruction_masks, char_prediction_masks)]
-
-        return (self._pad_tensors(recognition_inputs),
-                self._pad_tensors(recognition_targets),
-                self._pad_tensors(recognition_loss_masks).to(self._device))
+        repr_embeddings = [self._repr_embedder.embed(inst.repr) for inst in batch.instances]
+        char_embeddings = [self._char_embedder.embed(inst.char_input) for inst in batch.instances]
+        
+        inputs = self._concat_and_pad(repr_embeddings, char_embeddings)
+        
+        repr_targets = [self._create_empty_target(inst.repr, inst.char_target)
+                        for inst in batch.instances]
+        char_targets = [inst.char_target for inst in batch.instances]
+        targets = self._concat_and_pad(repr_targets, char_targets)
+        
+        repr_masks = [self._create_bool_mask(tgt, value=False) for tgt in repr_targets]
+        char_masks = [self._create_bool_mask(tgt, value=True) for tgt in char_targets]
+        masks = self._concat_and_pad(repr_masks, char_masks)
+        
+        return inputs, targets, masks
 
     def prepare_gen_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
-        char_embeddings = [self._char_embedder.embed(instance.char) for instance in batch.instances]
-        ink_input_embeddings = [self._repr_embedder.embed(instance.repr_input) for instance in batch.instances]
-        generation_inputs = [torch.cat([char_emb, ink_emb], dim=0) 
-                            for char_emb, ink_emb in zip(char_embeddings, ink_input_embeddings)]
+        char_embeddings = [self._char_embedder.embed(inst.char) for inst in batch.instances]
+        repr_embeddings = [self._repr_embedder.embed(inst.repr_input) for inst in batch.instances]
+        
+        inputs = self._concat_and_pad(char_embeddings, repr_embeddings)
+        
+        char_targets = [self._create_empty_target(inst.char, inst.repr_target)
+                        for inst in batch.instances]
+        repr_targets = [inst.repr_target for inst in batch.instances]
+        targets = self._concat_and_pad(char_targets, repr_targets)
+        
+        char_masks = [self._create_bool_mask(tgt, value=False) for tgt in char_targets]
+        repr_masks = [self._create_bool_mask(tgt, value=True) for tgt in repr_targets]
+        masks = self._concat_and_pad(char_masks, repr_masks)
+        
+        return inputs, targets, masks
 
-        char_reconstruction_targets = [instance.char for instance in batch.instances]
-        ink_generation_targets = [instance.repr_target for instance in batch.instances]
-        generation_targets = [torch.cat([char_tgt, ink_tgt], dim=0) 
-                             for char_tgt, ink_tgt in zip(char_reconstruction_targets, ink_generation_targets)]
+    def _create_empty_target(self, orig_target: Tensor, ref_target: Tensor) -> Tensor:
+        if ref_target.dtype in {torch.int, torch.long}:
+            return self._create_bool_mask(orig_target, value=False).int()
 
-        char_reconstruction_masks = [torch.ones(char_emb.shape[0]) for char_emb in char_embeddings]
-        ink_generation_masks = [torch.zeros(ink_tgt.shape[0]) for ink_tgt in ink_generation_targets]
-        generation_loss_masks = [torch.cat([char_mask, ink_mask], dim=0)
-                                for char_mask, ink_mask in zip(char_reconstruction_masks, ink_generation_masks)]
+        assert ref_target.dtype == torch.float, f"{ref_target.dtype=}"
 
-        return (self._pad_tensors(generation_inputs),
-                self._pad_tensors(generation_targets),
-                self._pad_tensors(generation_loss_masks).to(self._device))
+        ref_dim = ref_target.shape[-1]
+
+        assert ref_dim == 5  # only Point-5 should require this logic
+
+        orig_len = orig_target.shape[0]
+        return torch.zeros(orig_len, ref_dim).to(self._device)
+
+    def _create_bool_mask(self, tensor: Tensor, value: bool) -> Tensor:
+        if value:
+            return torch.ones(tensor.shape[0], dtype=torch.bool).to(self._device)
+        else:
+            return torch.zeros(tensor.shape[0], dtype=torch.bool).to(self._device)
+
+    def _concat_and_pad(self, first_vectors: list[Tensor], 
+                        second_vectors: list[Tensor]) -> Tensor:
+        combined = [torch.cat([first, second], dim=0) 
+                    for first, second in zip(first_vectors, second_vectors)]
+        return self._pad_tensors(combined)
 
     def _pad_tensors(self, tensors: list[Tensor]) -> Tensor:
         return pad_sequence(tensors, batch_first=True, padding_value=0)

@@ -71,14 +71,27 @@ class RecognitionModel(LocalModel, LossMixin):
 
 
 if __name__ == "__main__":
-    from core.data_schema import Parsed
+    from core.model import Task, ModelId
+    from dataloader.create import create_dataloaders
+    from model.factory import ReprEmbedderFactory
     from core.utils import distributed_context
-    from model.modules.embedder import VectorEmbedder
 
-    parsed = Parsed.load_random()
-    repr_tensor = torch.randn(100, 100).to(distributed_context.device)
-    instance = Instance(parsed=parsed, _repr_tensor=torch.randn(100, 100))
-    model = RecognitionModel(repr_embedder=VectorEmbedder(100)).to(distributed_context.device)
-    model.eval()
-    text_pred = model.predict_text(instance)
-    print(text_pred)
+    for model_id in ModelId.create_task_model_ids(Task.RECOGNITION)[::-1]:
+        print(model_id)
+        train_loader, val_loader, test_loader = create_dataloaders(
+            model_id=model_id,
+            batch_size=1,
+            num_workers=0,
+            pin_memory=False,
+            persistent_workers=False,
+        )
+
+        repr_embedder = ReprEmbedderFactory.create(model_id)
+        model = RecognitionModel(repr_embedder=repr_embedder).to(distributed_context.device)
+        for batch in train_loader:
+            model.train()
+            losses = model.losses(batch)
+            print(losses)
+            model.eval()
+            model.monitor(batch)
+            break

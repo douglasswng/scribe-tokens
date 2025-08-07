@@ -12,9 +12,11 @@ class LossMixin:
         target_flat = target.reshape(-1)
         mask_flat = mask.reshape(-1)
         
-        valid_mask = mask_flat.bool()
-        valid_logits = logits_flat[valid_mask]
-        valid_targets = target_flat[valid_mask]
+        if mask_flat.dtype != torch.bool:
+            raise ValueError(f"Mask must be a boolean tensor, got {mask_flat.dtype}")
+
+        valid_logits = logits_flat[mask_flat]
+        valid_targets = target_flat[mask_flat]
 
         criterion = nn.CrossEntropyLoss(reduction='none')
         loss: Tensor = criterion(valid_logits, valid_targets)

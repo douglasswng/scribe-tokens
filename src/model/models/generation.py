@@ -167,7 +167,10 @@ if __name__ == "__main__":
 
         repr_embedder = ReprEmbedderFactory.create(model_id)
         model = GenerationModel(repr_id=model_id.repr_id, repr_embedder=repr_embedder).to(distributed_context.device)
-        model.eval()
         for batch in train_loader:
+            model.train()
+            losses = model.losses(batch)
+            print(losses)
+            model.eval()
             model.monitor(batch)
             break

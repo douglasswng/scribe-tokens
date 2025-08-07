@@ -37,11 +37,39 @@ class DefaultModelFactory(ModelFactory):
                 local_model = GenerationModel(model_id=model_id, repr_embedder=repr_embedder)
             case Task.PRETRAINING_NTP:
                 local_model = PretrainingModel(model_id=model_id, repr_embedder=repr_embedder)
+            case Task.RECOGNITION_SFT:
+                local_model = cls._create_recog_sft(model_id)
+            case Task.GENERATION_SFT:
+                local_model = cls._create_gen_sft(model_id)
             case _:
                 raise ValueError(f"Unknown model id: {model_id}")
             
         return local_model.to(distributed_context.device)
-            
+
+    @classmethod
+    def _load_pretraining_model(cls, model_id: ModelId) -> PretrainingModel:
+        pretrain_model_id = ModelId(task=Task.PRETRAINING_NTP, repr_id=model_id.repr_id)
+        pretrain_model = cls.load_pretrained(pretrain_model_id)
+        assert isinstance(pretrain_model, PretrainingModel)
+        return pretrain_model
+
+    @classmethod
+    def _create_recog_sft(cls, model_id: ModelId) -> LocalModel:
+        pretrain_model = cls._load_pretraining_model(model_id)
+        base_model_id = ModelId(task=Task.RECOGNITION, repr_id=model_id.repr_id)
+        local_model = RecognitionModel(model_id=base_model_id,
+                                       repr_embedder=pretrain_model.repr_embedder,
+                                       decoder=pretrain_model.decoder)
+        return local_model
+
+    @classmethod
+    def _create_gen_sft(cls, model_id: ModelId) -> LocalModel:
+        pretrain_model = cls._load_pretraining_model(model_id)
+        base_model_id = ModelId(task=Task.GENERATION, repr_id=model_id.repr_id)
+        local_model = GenerationModel(model_id=base_model_id,
+                                      repr_embedder=pretrain_model.repr_embedder,
+                                      decoder=pretrain_model.decoder)
+        return local_model
 
 if __name__ == "__main__":
     for model_id in ModelId.create_defaults():

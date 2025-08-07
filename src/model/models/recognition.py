@@ -10,12 +10,12 @@ from model.models.batch_utils import BatchPreper
 
 
 class RecognitionModel(LocalModel, LossMixin):
-    def __init__(self, model_id: ModelId, repr_embedder: Embedder):
+    def __init__(self, model_id: ModelId, repr_embedder: Embedder, decoder: TransformerDecoder | None=None):
         super().__init__()
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
-        self._decoder = TransformerDecoder()
+        self._decoder = decoder or TransformerDecoder()
         
         self._batch_preper = BatchPreper(task=model_id.task, repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 

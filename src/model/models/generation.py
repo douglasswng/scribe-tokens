@@ -13,12 +13,12 @@ from model.models.loss_mixin import LossMixin
 
 
 class GenerationModel(LocalModel, LossMixin):
-    def __init__(self, model_id: ModelId, repr_embedder: Embedder):
+    def __init__(self, model_id: ModelId, repr_embedder: Embedder, decoder: TransformerDecoder | None=None):
         super().__init__()
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
-        self._decoder = TransformerDecoder()
+        self._decoder = decoder or TransformerDecoder()
 
         self._repr_id = model_id.repr_id
         self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._repr_id)
@@ -158,7 +158,7 @@ if __name__ == "__main__":
         print(model_id)
         train_loader, val_loader, test_loader = create_dataloaders(
             model_id=model_id,
-            batch_size=1,
+            batch_size=2,
             num_workers=0,
             pin_memory=False,
             persistent_workers=False,

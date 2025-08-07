@@ -1,12 +1,21 @@
 from core.model import ModelId
 from model.modules.embedder import Embedder
-
+from model.modules.decoder import TransformerDecoder
 from model.models.generation import GenerationModel
+
 
 
 class PretrainingModel(GenerationModel):
     def __init__(self, model_id: ModelId, repr_embedder: Embedder):
         super().__init__(model_id=model_id, repr_embedder=repr_embedder)
+
+    @property
+    def decoder(self) -> TransformerDecoder:
+        return self._decoder
+
+    @property
+    def repr_embedder(self) -> Embedder:
+        return self._repr_embedder
 
         
 if __name__ == "__main__":

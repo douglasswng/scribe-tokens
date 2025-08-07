@@ -63,7 +63,8 @@ class DistributedModel(DDP):
             raise ValueError("DistributedModel can only be used in distributed mode")
         
         super().__init__(local_model,
-                         device_ids=distributed_context.device_ids)  # char embedder's unembed sometimes not used
+                         device_ids=distributed_context.device_ids,
+                         find_unused_parameters=True)  # char embedder's unembed sometimes not used
 
     @property
     def local_model(self) -> LocalModel:

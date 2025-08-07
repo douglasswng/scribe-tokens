@@ -3,6 +3,7 @@ from pathlib import Path
 from core.model.id import ModelId
 from core.constants import CHECKPOINTS_DIR, MODELS_DIR, METRICS_DIR
 
+
 class ModelPaths:
     def __init__(self, model_id: ModelId):
         self._model_id = model_id

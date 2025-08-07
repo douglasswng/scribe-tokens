@@ -7,16 +7,17 @@ from core.utils import set_random_seed
 from core.constants import PARSED_DIR, BLACKLIST_PATH
 
 
-def split_paths(paths: list[Path], train_ratio: float) -> tuple[list[Path], list[Path], list[Path]]:
+def split_paths(paths: list[Path], train_ratio: float, val_ratio: float
+                ) -> tuple[list[Path], list[Path], list[Path]]:
     shuffled_paths = paths.copy()
     random.shuffle(shuffled_paths)
 
     train_count = int(len(shuffled_paths) * train_ratio)
+    val_count = int(len(shuffled_paths) * val_ratio)
 
     train_paths = shuffled_paths[:train_count]
-    val_paths = shuffled_paths[train_count:]
-    test_paths = []  # not need test set
-
+    val_paths = shuffled_paths[train_count:train_count + val_count]
+    test_paths = shuffled_paths[train_count + val_count:]
     return train_paths, val_paths, test_paths
 
 
@@ -28,12 +29,13 @@ def get_blacklist() -> set[str]:
 @lru_cache(maxsize=1)
 def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
     RANDOM_SEED = 42
-    TRAIN_RATIO = 0.95
+    TRAIN_RATIO = 0.8
+    VAL_RATIO = 0.1
 
     set_random_seed(RANDOM_SEED)
     parsed_paths = list(PARSED_DIR.rglob('*.json'))[:]
     valid_paths = [path for path in parsed_paths if path.stem not in get_blacklist()]
-    return split_paths(valid_paths, TRAIN_RATIO)
+    return split_paths(valid_paths, TRAIN_RATIO, VAL_RATIO)
 
 
 @dataclass(frozen=True)

@@ -64,7 +64,16 @@ class VectorReprId(ReprId):
     @property
     def has_oov(self) -> bool:
         return False
-    
+
+    @property
+    def dim(self) -> int:
+        match self.type:
+            case VectorReprType.POINT3:
+                return 3
+            case VectorReprType.POINT5:
+                return 5
+            case _:
+                raise ValueError(f"Unknown vector repr type: {self.type}")
 
 class TokenReprType(Enum):
     SCRIBE = 'ScribeTokens'
@@ -86,7 +95,7 @@ class TokenReprId(ReprId):
         return f'{self.type.value}-{self._delta} (vocab_size: {self._vocab_size})'
     
     @classmethod
-    def create_defaults(cls) -> list[Self]:
+    def create_defaults(cls) -> list[ReprId]:
         ids = []
         for type in TokenReprType:
             id = cls(type, DELTA, VOCAB_SIZE)

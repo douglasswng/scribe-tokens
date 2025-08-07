@@ -1,4 +1,4 @@
-from typing import Self, Literal
+from typing import Self
 from enum import Enum
 from dataclasses import dataclass
 
@@ -12,18 +12,6 @@ class Task(Enum):
     RECOGNITION_SFT = 'recognition_sft'
     GENERATION_SFT = 'generation_sft'
 
-    @property
-    def is_recognition(self) -> bool:
-        return self in [Task.RECOGNITION, Task.RECOGNITION_SFT]
-    
-    @property
-    def is_generation(self) -> bool:
-        return self in [Task.GENERATION, Task.GENERATION_SFT, Task.PRETRAINING_NTP]
-
-    @property
-    def is_pretraining(self) -> bool:
-        return self == Task.PRETRAINING_NTP
-
 
 @dataclass(frozen=True)
 class ModelId:
@@ -32,20 +20,11 @@ class ModelId:
 
     def __str__(self) -> str:
         return f"Task: {self.task.value}, Repr: {self.repr_id}"
-
-    @classmethod
-    def _get_vector_repr_id(cls, task: Task) -> ReprId:
-        if task.is_recognition:
-            return VectorReprId.create_point3()
-        elif task.is_generation:
-            return VectorReprId.create_point5()
-        else:
-            raise ValueError(f"Invalid task: {task}")
     
     @classmethod
     def _get_repr_ids(cls, task: Task) -> list[ReprId]:
-        token_repr_ids = TokenReprId.create_defaults()
-        vector_repr_id = cls._get_vector_repr_id(task)
+        token_repr_ids: list[ReprId] = TokenReprId.create_defaults()
+        vector_repr_id: ReprId = VectorReprId.create_point5()
         return token_repr_ids + [vector_repr_id]
     
     @classmethod

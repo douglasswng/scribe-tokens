@@ -19,15 +19,14 @@ class RecognitionModel(LocalModel, LossMixin):
         
         self._batch_preper = BatchPreper(repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 
-    def _forward(self, input: Tensor, target_mask: Tensor) -> Tensor:
+    def _forward(self, input: Tensor) -> Tensor:
         pred = self._decoder(input)
-        pred = pred * target_mask.unsqueeze(-1)
         logits = self._char_embedder.unembed(pred)
         return logits
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
         input, target, target_mask = self._batch_preper.prepare_recog_batch(batch)
-        logits = self._forward(input, target_mask)
+        logits = self._forward(input)
         return {'ce': self.ce_loss(logits, target, target_mask)}
     
     def _generate_next_id(self, static_input: Tensor, generated_ids: list[int]) -> int:
@@ -38,12 +37,7 @@ class RecognitionModel(LocalModel, LossMixin):
         else:
             current_input = static_input
 
-        target_mask = torch.cat([
-            torch.zeros(static_input.shape[0], device=static_input.device),
-            torch.ones(len(generated_ids), device=static_input.device)
-        ], dim=0)
-
-        logits = self._forward(current_input.unsqueeze(0), target_mask.unsqueeze(0))
+        logits = self._forward(current_input.unsqueeze(0))
         next_id = torch.argmax(logits[0, -1], dim=-1)
         return int(next_id)
 
@@ -77,8 +71,8 @@ class RecognitionModel(LocalModel, LossMixin):
 
 
 if __name__ == "__main__":
-    from core.data_schema.parsed import Parsed
-    from core.utils.distributed_context import distributed_context
+    from core.data_schema import Parsed
+    from core.utils import distributed_context
     from model.modules.embedder import VectorEmbedder
 
     parsed = Parsed.load_random()

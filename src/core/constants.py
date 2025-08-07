@@ -52,7 +52,7 @@ BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
 NUM_EPOCHS = 300
 PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs
-WEIGHT_DECAY = 0.5
+WEIGHT_DECAY = 0.1
 
 # Augmenter hyperparameters
 SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)

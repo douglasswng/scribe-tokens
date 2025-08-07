@@ -2,122 +2,144 @@ from functools import partial
 
 import torch
 from torch import Tensor
-import torch.nn as nn
 
 from core.model import LocalModel, ModelId
 from core.data_schema import Batch, DigitalInk, Instance
 from repr.factory import DefaultReprFactory
-from model.modules.embedder import Embedder, CharEmbedder
+from model.modules.embedder import Embedder, CharEmbedder, MDNOutput
 from model.modules.decoder import TransformerDecoder
+from model.models.batch_utils import BatchPreper
+from model.models.loss_mixin import LossMixin
 
 
-class GenerationModel(LocalModel):
-    def __init__(self, model_id: ModelId, repr_embedder: Embedder):
+class GenerationModel(LocalModel, LossMixin):
+    def __init__(self, model_id: ModelId, repr_embedder: Embedder, decoder: TransformerDecoder | None=None):
         super().__init__()
-        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=model_id.repr_id)
-
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
-        self._decoder = TransformerDecoder()
+        self._decoder = decoder or TransformerDecoder()
 
-    def _extend_char_mask(self, input: Tensor, char_mask: Tensor) -> Tensor:
-        _, input_seq_len = input.shape
-        _, char_seq_len = char_mask.shape
-        
-        extended_char_mask = torch.zeros_like(input, dtype=torch.bool)
-        
-        min_seq_len = min(input_seq_len, char_seq_len)
-        extended_char_mask[:, :min_seq_len] = char_mask[:, :min_seq_len]
-        
-        return extended_char_mask
+        self._repr_id = model_id.repr_id
+        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._repr_id)
+        self._batch_preper = BatchPreper(task=model_id.task, repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 
-    def _forward(self, input: torch.Tensor,
-                 char_mask: Tensor) -> Tensor:
-        char_mask = self._extend_char_mask(input=input, char_mask=char_mask)
-        repr_mask = ~char_mask
-        
-        repr_input = input * repr_mask
-        char_input = input * char_mask
-        
-        repr_embedded = self._repr_embedder.embed(repr_input)
-        char_embedded = self._char_embedder.embed(char_input)
-
-        repr_embedded = repr_embedded * repr_mask.unsqueeze(-1)
-        char_embedded = char_embedded * char_mask.unsqueeze(-1)
-
-        combined_input = repr_embedded + char_embedded
-        
-        output = self._decoder(combined_input)
-        logits = self._repr_embedder.unembed(output)
-        return logits
-    
-    def _ce_loss(self,
-                 pred: Tensor,
-                 target: Tensor,
-                 mask: Tensor) -> Tensor:
-        logits_flat = pred.reshape(-1, pred.size(-1))
-        target_flat = target.reshape(-1)
-        mask_flat = mask.reshape(-1)
-        criterion = nn.CrossEntropyLoss(reduction='none')
-        loss = criterion(logits_flat, target_flat)
-        masked_loss = loss * mask_flat
-        return masked_loss.sum() / mask_flat.sum()
+    def _forward(self, input: Tensor) -> Tensor | MDNOutput:
+        pred = self._decoder(input)
+        pred = self._repr_embedder.unembed(pred)
+        return pred
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
-        assert isinstance(batch, PairBatch)
-        main_repr_pred = self._forward(
-            input=batch.input,
-            char_mask=batch.char_mask
-        )
-        loss = self._ce_loss(main_repr_pred, batch.target, batch.target_mask)
-        return {'ntp_ce': loss}
+        input, target, target_mask = self._batch_preper.prepare_batch(batch)
+        pred = self._forward(input)
+        match pred:
+            case Tensor():
+                loss = self.ce_loss(pred, target, target_mask)
+                return {'ce': loss}
+            case tuple():
+                loss = self.nll_loss(pred, target, target_mask)
+                return {'nll': loss}
+            case _:
+                raise ValueError(f"Invalid prediction type: {type(pred)}")
+
+    def _sample_next_token(self, pred: Tensor, temperature: float = 1.0) -> Tensor:
+        last_pred = pred[:, -1]
+        probs = torch.softmax(last_pred / temperature, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1)
+        return next_token
+
+    def _sample_mixture(self, mixtures: Tensor, means: Tensor, stds: Tensor, rhos: Tensor,
+                        temperature: float = 1.0) -> tuple[Tensor, Tensor, Tensor]:
+        batch_size = mixtures.size(0)
+        batch_indices = torch.arange(batch_size)
+
+        mixture_probs = torch.softmax(mixtures / temperature, dim=-1)
+        mixture_indices = torch.multinomial(mixture_probs, 1).squeeze(-1)
+
+        selected_means = means[batch_indices, mixture_indices]  # [batch_size, 2]
+        selected_stds = stds[batch_indices, mixture_indices]    # [batch_size, 2]
+        selected_rhos = rhos[batch_indices, mixture_indices]    # [batch_size]
+
+        return selected_means, selected_stds, selected_rhos
     
-    def _generate_next_token(self, input: Tensor, 
-                             char_mask: Tensor,
-                             temperature: float = 1.0) -> Tensor:
-        gen_repr_pred = self._forward(
-            input=input,
-            char_mask=char_mask
-        )
-        last_pred = gen_repr_pred[:, -1]
-        token_probs = torch.softmax(last_pred / temperature, dim=-1)
-        token_indices = torch.multinomial(token_probs, 1)  # Keep shape [batch_size, 1]
-        return token_indices
-    
-    def _is_end(self, gen_repr: Tensor, max_len: int=1000) -> bool:  # TODO: more advanced
-        if gen_repr.size(1) > max_len:
-            return True
-        return False
-    
-    def _generate_tensor(self, instance_pair: InstancePair,
-                         num_gen: int = 1,
-                         temperature: float = 1.0) -> Tensor:
-        context = instance_pair.context.unsqueeze(0).expand(num_gen, -1)
-        char_mask = instance_pair.char_mask.unsqueeze(0).expand(num_gen, -1)
-        gen_repr = context[:, :1]  # bos token
+    def _sample_xy(self, means: Tensor, stds: Tensor, rhos: Tensor) -> tuple[Tensor, Tensor]:
+        batch_size = means.size(0)
         
-        while not self._is_end(gen_repr):
-            input = torch.cat([context, gen_repr], dim=1)
-            next_token = self._generate_next_token(
-                input=input,
-                char_mask=char_mask,
-                temperature=temperature
-            )
-            gen_repr = torch.cat([gen_repr, next_token], dim=1)
-        return gen_repr
+        std_x, std_y = stds[:, 0], stds[:, 1]
+        z = torch.randn(batch_size, 2).to(means.device)
+
+        x = means[:, 0] + std_x * z[:, 0]
+        y = means[:, 1] + std_y * (rhos * z[:, 0] + torch.sqrt(1 - rhos**2) * z[:, 1])
+        return x, y
+    
+    def _sample_pen_state(self, pen_states: Tensor, temperature: float = 1.0) -> tuple[Tensor, Tensor, Tensor]:
+        pen_probs = torch.softmax(pen_states / temperature, dim=-1)
+        pen_state = torch.multinomial(pen_probs, 1).squeeze(-1)
+        pen_up = (pen_state == 0).float()
+        pen_down = (pen_state == 1).float()
+        end_stroke = (pen_state == 2).float()
+        return pen_up, pen_down, end_stroke
+
+    def _sample_next_vector(self, pred: MDNOutput, temperature: float = 1.0) -> Tensor:
+        last_pred = tuple(tensor[:, -1] for tensor in pred)
+        mixtures, means, stds, rhos, pen_states = last_pred
+
+        selected_means, selected_stds, selected_rhos = self._sample_mixture(
+            mixtures, means, stds, rhos, temperature)
+        x, y = self._sample_xy(selected_means, selected_stds, selected_rhos)
+
+        pen_up, pen_down, end_stroke = self._sample_pen_state(pen_states, temperature)
+        
+        next_vector = torch.stack([x, y, pen_up, pen_down, end_stroke], dim=-1).unsqueeze(1)
+        return next_vector
+
+    def _generate_next_tensor(self, static_input: Tensor,
+                              gen_tensors: Tensor,
+                              temperature: float = 1.0) -> Tensor:
+        gen_embedded = self._repr_embedder.embed(gen_tensors)
+        current_input = torch.cat([static_input, gen_embedded], dim=1)
+        pred = self._forward(current_input)
+        match pred:
+            case Tensor():
+                return self._sample_next_token(pred, temperature)
+            case tuple():
+                return self._sample_next_vector(pred, temperature)
+            case _:
+                raise ValueError(f"Invalid prediction type: {type(pred)}")
+
+    def _terminate_generation(self, gen_tensors: Tensor, eos: Tensor) -> bool:
+        has_eos = torch.any(gen_tensors == eos, dim=1)
+        return bool(has_eos.all())
         
     def generate_inks(self, instance: Instance,
                       num_gen: int = 1,
-                      temperature: float = 1.0) -> list[DigitalInk]:
+                      temperature: float = 1.0,
+                      max_len: int = 500) -> list[DigitalInk]:
         if self.training:
             raise ValueError("Generation is not supported in training mode")
         
         with torch.no_grad():
-            tensor = self._generate_tensor(instance_pair=instance_pair,
-                                           num_gen=num_gen,
-                                           temperature=temperature)
-            inks = [self._ink_callable(tensor=gen_repr) for gen_repr in tensor]
+            char_embedded = self._char_embedder.embed(instance.char)
+            static_input = char_embedded.unsqueeze(0).expand(num_gen, -1, -1)
+
+            if self._repr_id.is_token:
+                gen_tensors = instance.repr_bos.unsqueeze(0).expand(num_gen, -1)
+            else:
+                gen_tensors = instance.repr_bos.unsqueeze(0).unsqueeze(0).expand(num_gen, -1, -1)
+
+            for _ in range(max_len):
+                next_tensor = self._generate_next_tensor(
+                    static_input=static_input,
+                    gen_tensors=gen_tensors,
+                    temperature=temperature
+                )
+                
+                gen_tensors = torch.cat([gen_tensors, next_tensor], dim=1)
+
+                if self._terminate_generation(gen_tensors, instance.repr_eos):
+                    break
+
+            inks = [self._ink_callable(tensor=gen_tensor) for gen_tensor in gen_tensors]
             return inks
     
     def monitor(self, batch: Batch) -> None:
@@ -127,25 +149,27 @@ class GenerationModel(LocalModel):
 
         
 if __name__ == "__main__":
-    from core.model import Task
+    from core.model import Task, ModelId
     from dataloader.create import create_dataloaders
+    from model.factory import ReprEmbedderFactory
     from core.utils import distributed_context
 
-    for model_id in ModelId.create_task_defaults(Task.GENERATION):
+    for model_id in ModelId.create_task_model_ids(Task.GENERATION)[::-1]:
+        print(model_id)
         train_loader, val_loader, test_loader = create_dataloaders(
             model_id=model_id,
-            batch_size=1,
+            batch_size=2,
             num_workers=0,
             pin_memory=False,
             persistent_workers=False,
         )
 
-        model = GenerationModel(model_id).to(distributed_context.device)
+        repr_embedder = ReprEmbedderFactory.create(model_id)
+        model = GenerationModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()
             losses = model.losses(batch)
-            print(f"Losses: {losses}")
-
+            print(losses)
             model.eval()
             model.monitor(batch)
             break

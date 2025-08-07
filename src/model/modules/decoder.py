@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.nn.utils.rnn import pad_sequence
 
 from model.modules.decoder_layer import TransformerDecoderLayer
 from core.constants import HIDDEN_DIM, NUM_HEADS, FFN_FACTOR, DROPOUT, NUM_LAYERS, MAX_LEN
@@ -56,22 +55,6 @@ class TransformerDecoder(nn.Module):
         # Final layer norm 
         x = self.norm(x)
         return x
-
-    def ce_loss(self, pred: Tensor, target: Tensor, mask: Tensor) -> Tensor:
-        logits_flat = pred.reshape(-1, pred.size(-1))
-        target_flat = target.reshape(-1)
-        mask_flat = mask.reshape(-1)
-        
-        valid_mask = mask_flat.bool()
-        valid_logits = logits_flat[valid_mask]
-        valid_targets = target_flat[valid_mask]
-
-        criterion = nn.CrossEntropyLoss(reduction='none')
-        loss = criterion(valid_logits, valid_targets)
-        return loss.mean()
-
-    def pad_tensors(self, tensors: list[Tensor]) -> Tensor:
-        return pad_sequence(tensors, batch_first=True, padding_value=0)
 
 
 if __name__ == "__main__":

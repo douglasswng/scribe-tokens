@@ -5,33 +5,19 @@ from core.model import LocalModel
 from core.data_schema import Batch, Instance, IdMapper
 from model.modules.embedder import CharEmbedder, Embedder
 from model.modules.decoder import TransformerDecoder
+from model.models.loss_mixin import LossMixin
+from model.models.batch_utils import BatchPreper
 
 
-class RecognitionModel(LocalModel):
+class RecognitionModel(LocalModel, LossMixin):
     def __init__(self, repr_embedder: Embedder):
         super().__init__()
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
         self._decoder = TransformerDecoder()
-
-    def _prepare_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
-        repr_inputs = [self._repr_embedder.embed(instance.repr) for instance in batch.instances]
-        char_inputs = [self._char_embedder.embed(instance.char_input) for instance in batch.instances]
-        inputs = [torch.cat([repr, char], dim=0) for repr, char in zip(repr_inputs, char_inputs)]
-
-        repr_targets = [instance.repr for instance in batch.instances]
-        char_targets = [instance.char_target for instance in batch.instances]
-        targets = [torch.cat([repr, char], dim=0) for repr, char in zip(repr_targets, char_targets)]
-
-        repr_input_masks = [torch.zeros(repr.shape[0]) for repr in repr_inputs]
-        char_target_masks = [torch.ones(char.shape[0]) for char in char_targets]
-        target_masks = [torch.cat([repr_mask, char_target_mask], dim=0)
-                        for repr_mask, char_target_mask in zip(repr_input_masks, char_target_masks)]
-
-        return (self._decoder.pad_tensors(inputs),
-                self._decoder.pad_tensors(targets),
-                self._decoder.pad_tensors(target_masks).to(self.device))
+        
+        self._batch_preper = BatchPreper(repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 
     def _forward(self, input: Tensor, target_mask: Tensor) -> Tensor:
         pred = self._decoder(input)
@@ -40,11 +26,11 @@ class RecognitionModel(LocalModel):
         return logits
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
-        input, target, target_mask = self._prepare_batch(batch)
+        input, target, target_mask = self._batch_preper.prepare_recog_batch(batch)
         logits = self._forward(input, target_mask)
-        return {'ce': self._decoder.ce_loss(logits, target, target_mask)}
+        return {'ce': self.ce_loss(logits, target, target_mask)}
     
-    def _generate_next_id(self, static_input: Tensor, generated_ids: list[int]) -> Tensor:
+    def _generate_next_id(self, static_input: Tensor, generated_ids: list[int]) -> int:
         if generated_ids:
             gen_tensor = torch.tensor(generated_ids, device=static_input.device)
             gen_embedded = self._char_embedder.embed(gen_tensor)
@@ -58,8 +44,8 @@ class RecognitionModel(LocalModel):
         ], dim=0)
 
         logits = self._forward(current_input.unsqueeze(0), target_mask.unsqueeze(0))
-        next_char = torch.argmax(logits[0, -1], dim=-1)
-        return next_char
+        next_id = torch.argmax(logits[0, -1], dim=-1)
+        return int(next_id)
 
     def predict_text(self, instance: Instance, max_len: int = 100) -> str:
         if self.training:
@@ -75,7 +61,7 @@ class RecognitionModel(LocalModel):
                 next_id = self._generate_next_id(
                     static_input=static_input,
                     generated_ids=generated_ids
-                ).item()
+                )
                 
                 if next_id == instance.char_eos.item():
                     break

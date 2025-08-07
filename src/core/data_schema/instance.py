@@ -50,3 +50,11 @@ class Instance:
     @property
     def char_eos(self) -> Tensor:
         return self.char[-1]
+
+    @property
+    def repr_bos(self) -> Tensor:
+        return self.repr[0]
+    
+    @property
+    def repr_eos(self) -> Tensor:
+        return self.repr[-1]

@@ -61,7 +61,8 @@ class TokenEmbedder(Embedder):
     def _add_unk_token(self, x: Tensor) -> Tensor:
         assert self._unk_token_id is not None
 
-        dropout_mask = torch.rand(x.size(0), x.size(1)) < UNKNOWN_TOKEN_RATE
+        shape = x.size(0) if x.dim() == 1 else (x.size(0), x.size(1))
+        dropout_mask = torch.rand(shape) < UNKNOWN_TOKEN_RATE
         dropout_mask = dropout_mask.to(x.device)
         x = x.masked_fill(dropout_mask, self._unk_token_id)
         return x

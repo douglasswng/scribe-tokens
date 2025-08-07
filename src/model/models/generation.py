@@ -5,19 +5,20 @@ from torch import Tensor
 import torch.nn as nn
 
 from core.model import LocalModel, ModelId
-from core.data_schema import Batch, DigitalInk
+from core.data_schema import Batch, DigitalInk, Instance
 from repr.factory import DefaultReprFactory
-from model.modules.embedder import Embedder, CharEmbedder, TokenEmbedder
+from model.modules.embedder import Embedder, CharEmbedder
 from model.modules.decoder import TransformerDecoder
 
 
 class GenerationModel(LocalModel):
-    def __init__(self, model_id: ModelId):
+    def __init__(self, model_id: ModelId, repr_embedder: Embedder):
         super().__init__()
-        self._model_id = model_id
+        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=model_id.repr_id)
 
-        self._repr_embedder: Embedder = TokenEmbedder()
-        self._char_embedder: Embedder = CharEmbedder()
+        self._repr_embedder = repr_embedder
+        self._char_embedder = CharEmbedder()
+
         self._decoder = TransformerDecoder()
 
     def _extend_char_mask(self, input: Tensor, char_mask: Tensor) -> Tensor:
@@ -106,26 +107,23 @@ class GenerationModel(LocalModel):
             gen_repr = torch.cat([gen_repr, next_token], dim=1)
         return gen_repr
         
-    def generate_inks(self, instance_pair: InstancePair,
+    def generate_inks(self, instance: Instance,
                       num_gen: int = 1,
                       temperature: float = 1.0) -> list[DigitalInk]:
         if self.training:
             raise ValueError("Generation is not supported in training mode")
-
-        ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._model_id.repr_id)
+        
         with torch.no_grad():
             tensor = self._generate_tensor(instance_pair=instance_pair,
                                            num_gen=num_gen,
                                            temperature=temperature)
-            inks = [ink_callable(tensor=gen_repr) for gen_repr in tensor]
+            inks = [self._ink_callable(tensor=gen_repr) for gen_repr in tensor]
             return inks
     
     def monitor(self, batch: Batch) -> None:
-        assert isinstance(batch, PairBatch)
-        sample = batch.get_random_sample()
-        instance_pair = sample.datapoints[0]
-        ink = self.generate_inks(instance_pair=instance_pair)[0]
-        ink.visualise(name=instance_pair.main_instance.parsed.text)
+        instance = batch.get_random_instance()
+        ink = self.generate_inks(instance=instance)[0]
+        ink.visualise(name=instance.parsed.text)
 
         
 if __name__ == "__main__":

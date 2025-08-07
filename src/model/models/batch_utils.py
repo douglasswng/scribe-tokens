@@ -1,14 +1,15 @@
 import torch
 from torch import Tensor
-from torch._prims_common import is_integer_dtype
 from torch.nn.utils.rnn import pad_sequence
 
 from core.data_schema import Batch
+from core.model import Task
 from model.modules.embedder import Embedder, CharEmbedder
 
 
 class BatchPreper:
-    def __init__(self, repr_embedder: Embedder, char_embedder: CharEmbedder):
+    def __init__(self, task: Task, repr_embedder: Embedder, char_embedder: CharEmbedder):
+        self._task = task
         self._repr_embedder = repr_embedder
         self._char_embedder = char_embedder
 
@@ -16,7 +17,30 @@ class BatchPreper:
     def _device(self) -> torch.device:
         return next(self._repr_embedder.parameters()).device
 
-    def prepare_recog_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
+    def prepare_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
+        match self._task:
+            case Task.RECOGNITION:
+                return self._prepare_recog_batch(batch)
+            case Task.GENERATION:
+                return self._prepare_gen_batch(batch)
+            case Task.PRETRAINING_NTP:
+                return self._prepare_pretrain_batch(batch)
+            case _:
+                raise ValueError(f"Invalid task: {self._task}")
+
+    def _prepare_pretrain_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
+        repr_embeddings = [self._repr_embedder.embed(inst.repr_input) for inst in batch.instances]
+        inputs = self._pad_tensors(repr_embeddings)
+
+        repr_targets = [inst.repr_target for inst in batch.instances]
+        targets = self._pad_tensors(repr_targets)
+
+        repr_masks = [self._create_bool_mask(tgt, value=True) for tgt in repr_targets]
+        masks = self._pad_tensors(repr_masks)
+
+        return inputs, targets, masks
+
+    def _prepare_recog_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
         repr_embeddings = [self._repr_embedder.embed(inst.repr) for inst in batch.instances]
         char_embeddings = [self._char_embedder.embed(inst.char_input) for inst in batch.instances]
         
@@ -33,7 +57,7 @@ class BatchPreper:
         
         return inputs, targets, masks
 
-    def prepare_gen_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
+    def _prepare_gen_batch(self, batch: Batch) -> tuple[Tensor, Tensor, Tensor]:
         char_embeddings = [self._char_embedder.embed(inst.char) for inst in batch.instances]
         repr_embeddings = [self._repr_embedder.embed(inst.repr_input) for inst in batch.instances]
         

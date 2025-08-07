@@ -3,8 +3,7 @@ from functools import partial
 import torch
 from torch import Tensor
 
-from core.repr import ReprId
-from core.model import LocalModel
+from core.model import LocalModel, ModelId
 from core.data_schema import Batch, DigitalInk, Instance
 from repr.factory import DefaultReprFactory
 from model.modules.embedder import Embedder, CharEmbedder, MDNOutput
@@ -14,16 +13,16 @@ from model.models.loss_mixin import LossMixin
 
 
 class GenerationModel(LocalModel, LossMixin):
-    def __init__(self, repr_id: ReprId, repr_embedder: Embedder):
+    def __init__(self, model_id: ModelId, repr_embedder: Embedder):
         super().__init__()
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
         self._decoder = TransformerDecoder()
 
-        self._repr_id = repr_id
-        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=repr_id)
-        self._batch_preper = BatchPreper(repr_embedder=repr_embedder, char_embedder=self._char_embedder)
+        self._repr_id = model_id.repr_id
+        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._repr_id)
+        self._batch_preper = BatchPreper(task=model_id.task, repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 
     def _forward(self, input: Tensor) -> Tensor | MDNOutput:
         pred = self._decoder(input)
@@ -31,7 +30,7 @@ class GenerationModel(LocalModel, LossMixin):
         return pred
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
-        input, target, target_mask = self._batch_preper.prepare_gen_batch(batch)
+        input, target, target_mask = self._batch_preper.prepare_batch(batch)
         pred = self._forward(input)
         match pred:
             case Tensor():
@@ -166,7 +165,7 @@ if __name__ == "__main__":
         )
 
         repr_embedder = ReprEmbedderFactory.create(model_id)
-        model = GenerationModel(repr_id=model_id.repr_id, repr_embedder=repr_embedder).to(distributed_context.device)
+        model = GenerationModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()
             losses = model.losses(batch)

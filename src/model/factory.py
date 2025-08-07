@@ -1,6 +1,8 @@
 from core.model import ModelFactory, ModelId, Task, LocalModel
 from tokeniser.factory import DefaultTokeniserFactory
 from model.models.recognition import RecognitionModel
+from model.models.generation import GenerationModel
+from model.models.pretraining import PretrainingModel
 from model.modules.embedder import Embedder, TokenEmbedder, VectorEmbedder
 from core.utils.distributed_context import distributed_context
 
@@ -30,7 +32,11 @@ class DefaultModelFactory(ModelFactory):
         repr_embedder = ReprEmbedderFactory.create(model_id)
         match model_id.task:
             case Task.RECOGNITION:
-                local_model = RecognitionModel(repr_embedder)
+                local_model = RecognitionModel(model_id=model_id, repr_embedder=repr_embedder)
+            case Task.GENERATION:
+                local_model = GenerationModel(model_id=model_id, repr_embedder=repr_embedder)
+            case Task.PRETRAINING_NTP:
+                local_model = PretrainingModel(model_id=model_id, repr_embedder=repr_embedder)
             case _:
                 raise ValueError(f"Unknown model id: {model_id}")
             

@@ -51,10 +51,6 @@ class ModelId:
     @classmethod
     def create_task_model_ids(cls, task: Task) -> list[Self]:
         return [cls(task=task, repr_id=repr_id) for repr_id in cls._get_repr_ids(task)]
-    
-    @classmethod
-    def create_task_defaults(cls, task: Task) -> list[Self]:
-        return [cls(task=task, repr_id=TokenReprId.create_scribe())]
 
     @classmethod
     def create_defaults(cls) -> list[Self]:

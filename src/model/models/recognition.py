@@ -1,7 +1,7 @@
 import torch
 from torch import Tensor
 
-from core.model import LocalModel
+from core.model import LocalModel, ModelId
 from core.data_schema import Batch, Instance, IdMapper
 from model.modules.embedder import CharEmbedder, Embedder
 from model.modules.decoder import TransformerDecoder
@@ -10,14 +10,14 @@ from model.models.batch_utils import BatchPreper
 
 
 class RecognitionModel(LocalModel, LossMixin):
-    def __init__(self, repr_embedder: Embedder):
+    def __init__(self, model_id: ModelId, repr_embedder: Embedder):
         super().__init__()
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
         self._decoder = TransformerDecoder()
         
-        self._batch_preper = BatchPreper(repr_embedder=repr_embedder, char_embedder=self._char_embedder)
+        self._batch_preper = BatchPreper(task=model_id.task, repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 
     def _forward(self, input: Tensor) -> Tensor:
         pred = self._decoder(input)
@@ -25,7 +25,7 @@ class RecognitionModel(LocalModel, LossMixin):
         return logits
 
     def losses(self, batch: Batch) -> dict[str, Tensor]:
-        input, target, target_mask = self._batch_preper.prepare_recog_batch(batch)
+        input, target, target_mask = self._batch_preper.prepare_batch(batch)
         logits = self._forward(input)
         return {'ce': self.ce_loss(logits, target, target_mask)}
     
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         )
 
         repr_embedder = ReprEmbedderFactory.create(model_id)
-        model = RecognitionModel(repr_embedder=repr_embedder).to(distributed_context.device)
+        model = RecognitionModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()
             losses = model.losses(batch)

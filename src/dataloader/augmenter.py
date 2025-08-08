@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 from core.data_schema import Parsed, DigitalInk
-from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA, AUGMENT_PROB
+from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA, AUGMENT_PROB, SHUFFLE_RANGE, REVERSE_RANGE
 
 
 def scale_coords(coords: list[np.ndarray], scale_factor: float) -> list[np.ndarray]:
@@ -46,14 +46,51 @@ def jitter_coords(coords: list[np.ndarray], sigma: float) -> list[np.ndarray]:
     return jittered_coords
 
 
+def shuffle_coords(coords: list[np.ndarray], shuffle_prob: float) -> list[np.ndarray]:
+    """Randomly shuffle the order of strokes."""
+    if shuffle_prob == 0 or len(coords) <= 1:
+        return coords
+    
+    shuffled_coords = coords.copy()
+    num_shuffled = int(len(coords) * shuffle_prob)
+    if num_shuffled <= 1:
+        return shuffled_coords
+    
+    shuffle_idxs = random.sample(range(len(coords)), num_shuffled)
+    strokes_to_shuffle = [shuffled_coords[i] for i in shuffle_idxs]
+    random.shuffle(strokes_to_shuffle)
+    
+    for i, shuffled_stroke in zip(shuffle_idxs, strokes_to_shuffle):
+        shuffled_coords[i] = shuffled_stroke
+    
+    return shuffled_coords
+
+
+def reverse_coords(coords: list[np.ndarray], reverse_prob: float) -> list[np.ndarray]:
+    """Reverse the coordinates within each stroke with some probability."""
+    if reverse_prob == 0:
+        return coords
+    
+    reversed_coords = []
+    for stroke_coords in coords:
+        if len(stroke_coords) > 1 and random.random() < reverse_prob:
+            reversed_coords.append(stroke_coords[::-1])
+        else:
+            reversed_coords.append(stroke_coords.copy())
+    return reversed_coords
+
+
 class AugmenterConfig:
     def __init__(self):
-        self.scale_factor = 1 + self._sample_arg(-SCALE_RANGE, SCALE_RANGE)
-        self.shear_factor = self._sample_arg(-SHEAR_FACTOR, SHEAR_FACTOR)
-        self.rotate_angle = self._sample_arg(-ROTATE_ANGLE, ROTATE_ANGLE)
-        self.jitter_sigma = self._sample_arg(0, JITTER_SIGMA)
+        self.scale_factor = 1 + self._sample_arg(SCALE_RANGE, -SCALE_RANGE)
+        self.shear_factor = self._sample_arg(SHEAR_FACTOR, -SHEAR_FACTOR)
+        self.rotate_angle = self._sample_arg(ROTATE_ANGLE, -ROTATE_ANGLE)
+        self.jitter_sigma = self._sample_arg(JITTER_SIGMA)
 
-    def _sample_arg(self, min_val: float, max_val: float, default: float=0) -> float:
+        self.shuffle = self._sample_arg(SHUFFLE_RANGE)
+        self.reverse = self._sample_arg(REVERSE_RANGE)
+
+    def _sample_arg(self, max_val: float, min_val: float=0, default: float=0) -> float:
         if random.random() <= AUGMENT_PROB:
             return random.uniform(min_val, max_val)
         return default
@@ -73,6 +110,8 @@ class Augmenter:
         np_coords = shear_coords(np_coords, cls._config.shear_factor)
         np_coords = rotate_coords(np_coords, cls._config.rotate_angle)
         np_coords = jitter_coords(np_coords, cls._config.jitter_sigma)
+        np_coords = shuffle_coords(np_coords, cls._config.shuffle)
+        np_coords = reverse_coords(np_coords, cls._config.reverse)
         
         # Convert back to DigitalInk
         augmented_ink = DigitalInk.from_coords(np_coords)
@@ -93,6 +132,16 @@ if __name__ == "__main__":
     augmented_parsed.visualise()
 
     repr_id = TokenReprId.create_scribe()
-    tensor = DefaultReprFactory.ink_to_tensor(repr_id, augmented_parsed.ink)
-    ink = DefaultReprFactory.tensor_to_ink(repr_id, tensor)
-    ink.visualise()
+
+    original_tensor = DefaultReprFactory.ink_to_tensor(repr_id, parsed.ink)
+    augmented_tensor = DefaultReprFactory.ink_to_tensor(repr_id, augmented_parsed.ink)
+
+    original_ink = DefaultReprFactory.tensor_to_ink(repr_id, original_tensor)
+    augmented_ink = DefaultReprFactory.tensor_to_ink(repr_id, augmented_tensor)
+    original_ink.visualise()
+    augmented_ink.visualise()
+
+    print("Original length:", len(parsed.ink))
+    print("Augmented length:", len(augmented_parsed.ink))
+    print("Original token count:", original_tensor.size(0))
+    print("Augmented token count:", augmented_tensor.size(0))

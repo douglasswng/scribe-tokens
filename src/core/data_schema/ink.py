@@ -1,6 +1,4 @@
 from typing import overload
-import math
-import re
 
 from pydantic import BaseModel
 from matplotlib import pyplot as plt
@@ -64,12 +62,6 @@ class Stroke[T: (float, int)](BaseModel):
     
     def scale(self, scale: float) -> 'Stroke':
         return Stroke(points=[point * scale for point in self.points])
-
-    def scale_x(self, scale: float) -> 'Stroke':
-        return Stroke(points=[Point(x=point.x * scale, y=point.y) for point in self.points])
-    
-    def scale_y(self, scale: float) -> 'Stroke':
-        return Stroke(points=[Point(x=point.x, y=point.y * scale) for point in self.points])
     
     def discretise(self) -> 'Stroke[int]':
         return Stroke(points=[point.round() for point in self.points])
@@ -120,25 +112,23 @@ class DigitalInk[T: (float, int)](BaseModel):
 
     @overload
     @classmethod
-    def from_coords(cls, raw_strokes: list[list[tuple[int, int]]], to_origin: bool=False) -> 'DigitalInk[int]': ...
+    def from_coords(cls, raw_strokes: list[list[tuple[int, int]]]) -> 'DigitalInk[int]': ...
     
     @overload
     @classmethod
-    def from_coords(cls, raw_strokes: list[list[tuple[float, float]]], to_origin: bool=False) -> 'DigitalInk[float]': ...
+    def from_coords(cls, raw_strokes: list[list[tuple[float, float]]]) -> 'DigitalInk[float]': ...
 
     @overload
     @classmethod
-    def from_coords(cls, raw_strokes: list[np.ndarray], to_origin: bool=False) -> 'DigitalInk': ...
+    def from_coords(cls, raw_strokes: list[np.ndarray]) -> 'DigitalInk': ...
 
     @classmethod
-    def from_coords(cls, raw_strokes, to_origin: bool=False):
+    def from_coords(cls, raw_strokes):
         strokes = []
         for stroke in raw_strokes:
             points = [Point(x=coord[0], y=coord[1]) for coord in stroke]
             strokes.append(Stroke(points=points))
         digital_ink = DigitalInk(strokes=strokes)
-        if to_origin:
-            digital_ink = digital_ink.to_origin()
         return digital_ink
     
     @classmethod
@@ -148,28 +138,6 @@ class DigitalInk[T: (float, int)](BaseModel):
             [(2, 1), (4, -1)],
         ]
         return cls.from_coords(raw_strokes)
-
-    @property
-    def bbox(self) -> tuple[Point, Point]:
-        min_x = min(point.x for stroke in self.strokes for point in stroke.points)
-        min_y = min(point.y for stroke in self.strokes for point in stroke.points)
-        max_x = max(point.x for stroke in self.strokes for point in stroke.points)
-        max_y = max(point.y for stroke in self.strokes for point in stroke.points)
-        return Point(x=min_x, y=min_y), Point(x=max_x, y=max_y)
-
-    @property
-    def height(self) -> float:
-        top_left, bottom_right = self.bbox
-        return bottom_right.y - top_left.y
-
-    @property
-    def width(self) -> float:
-        top_left, bottom_right = self.bbox
-        return bottom_right.x - top_left.x
-
-    @property
-    def start(self) -> Point:
-        return self.strokes[0].points[0]
 
     def to_coords(self) -> list[list[tuple[float, float]]]:
         return [[(point.x, point.y) for point in stroke.points] for stroke in self.strokes]
@@ -183,12 +151,6 @@ class DigitalInk[T: (float, int)](BaseModel):
     
     def scale(self, scale: float) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.scale(scale) for stroke in self.strokes])
-
-    def scale_x(self, scale: float) -> 'DigitalInk':
-        return DigitalInk(strokes=[stroke.scale_x(scale) for stroke in self.strokes])
-
-    def scale_y(self, scale: float) -> 'DigitalInk':
-        return DigitalInk(strokes=[stroke.scale_y(scale) for stroke in self.strokes])
     
     def discretise(self) -> 'DigitalInk[int]':
         return DigitalInk(strokes=[stroke.discretise() for stroke in self.strokes])

@@ -5,7 +5,7 @@ import ujson as json
 
 from core.utils import distributed_context
 from core.repr import TokenReprId, TokenReprType
-from core.tokeniser import DiscreteTokeniser, TrainedTokeniser, DeltaPreprocessor, DeltaSmoothPreprocessor, RegularToken, Token, Tokeniser, TokeniserFactory
+from core.tokeniser import DiscreteTokeniser, TrainedTokeniser, DeltaSmoothPreprocessor, RegularToken, Token, Tokeniser, TokeniserFactory
 from tokeniser.tokenisers.abs import AbsTokeniser
 from tokeniser.tokenisers.rel import RelTokeniser
 from tokeniser.tokenisers.scribe import ScribeTokeniser
@@ -96,10 +96,8 @@ class DefaultTokeniserFactory(TokeniserFactory):
     @classmethod
     @lru_cache(maxsize=128)
     def create(cls, id: TokenReprId) -> Tokeniser:
-        if id.is_scribe:
-            preprocessor = DeltaSmoothPreprocessor(delta=id.delta, downsample_factor=SCRIBE_DOWNSAMPLE_FACTOR)
-        else:
-            preprocessor = DeltaSmoothPreprocessor(delta=id.delta, downsample_factor=1)
+        downsample_factor = SCRIBE_DOWNSAMPLE_FACTOR if id.is_scribe else 1
+        preprocessor = DeltaSmoothPreprocessor(delta=id.delta, downsample_factor=downsample_factor)
         discrete_tokeniser = DiscreteFactory.create_discrete_tokeniser(id)
         trained_tokeniser = TrainedFactory.from_pretrained(id)
         return Tokeniser(preprocessor, discrete_tokeniser, trained_tokeniser)
@@ -109,16 +107,13 @@ if __name__ == "__main__":
     from core.data_schema import Parsed
 
     ink = Parsed.load_random().ink
-    # ink = Parsed.from_path('/Users/douglasswang/Desktop/TCL/writing_beaut/ScribeTokens0728/data/parsed/iam/n09-105z-06.json').ink
-    ink = Parsed.from_path('/data/doug/ScribeTokens0728/data/parsed/iam/a10-673z-05.json').ink
     ink.visualise()
     print(f"DigitalInk length: {len(ink)}")
 
-    #for id in TokenReprId.create_defaults():
-    for id in [TokenReprId.create_scribe()]:
+    for id in TokenReprId.create_defaults():
         tokeniser = DefaultTokeniserFactory.create(id)
         tokens = tokeniser.tokenise(ink)
-        print(f"Tokeniser length: {len(tokens)}")  
+        print(f"{id} length: {len(tokens)}")  
         
         ink = tokeniser.detokenise(tokens)
         ink.visualise()

@@ -19,7 +19,7 @@ class DeltaPreprocessor(Preprocessor):
         return digital_ink.scale(self._delta)
     
 
-class DeltaSmoothPreprocessor(Preprocessor):
+class DeltaSmoothPreprocessor(DeltaPreprocessor):
     def __init__(self, delta: int | float,
                  downsample_factor: int,
                  smooth_window_length: int=7,
@@ -29,9 +29,6 @@ class DeltaSmoothPreprocessor(Preprocessor):
         self._smooth_window_length = smooth_window_length
         self._smooth_polyorder = smooth_polyorder
 
-    def preprocess(self, digital_ink: DigitalInk) -> DigitalInk[int]:
-        return digital_ink.scale(1 / self._delta).discretise()
-    
     def postprocess(self, digital_ink: DigitalInk[int]) -> DigitalInk:
         digital_ink = digital_ink.scale(self._delta)
         digital_ink = digital_ink.downsample(factor=self._downsample_factor)

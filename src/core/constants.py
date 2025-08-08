@@ -27,10 +27,11 @@ CHARS = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
          + "0123456789"
          + " !\"#%&'()+,-./:;?")
 NUM_CHARS = len(CHARS)  # 79
+STD = 50  # approximate std of dx and dy, used for normalisation
 
 # Experiment hyperparameters
-VOCAB_SIZE = 50000
-DELTA = 4
+VOCAB_SIZE = 32000
+DELTA = 8
 MAX_LEN = int(1e4)
 SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
@@ -41,13 +42,12 @@ NUM_LAYERS = 12
 NUM_HEADS = 6
 DROPOUT = 0.1
 NUM_MIXTURES = 20
-STD = 50  # the approximate std of the dx and dy values in the dataset
 
 # Training hyperparameters
-UNKNOWN_TOKEN_RATE = 0.002  # match the unknown rate on the validation set
+UNKNOWN_TOKEN_RATE = 0.002  # match the unknown rate on the validation set (~0.2% when DELTA=8, ~0.3% when DELTA=4)
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
-NUM_EPOCHS = 300
+NUM_EPOCHS = 200
 PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs
 WEIGHT_DECAY = 0.1
 
@@ -56,4 +56,6 @@ SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
 SHEAR_FACTOR = 0.5  # shear factor between (-SHEAR_FACTOR, SHEAR_FACTOR)
 ROTATE_ANGLE = 5  # rotate angle (degrees) between (-ROTATE_ANGLE, ROTATE_ANGLE)
 JITTER_SIGMA = 5  # the std of gaussian noise added to the points
+SHUFFLE_RANGE = 1.0  # probability a stroke is shuffled is between (0, SHUFFLE_RANGE)
+REVERSE_RANGE = 1.0  # probability a stroke is reversed is between (0, REVERSE_RANGE)
 AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, independently

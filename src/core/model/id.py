@@ -6,8 +6,8 @@ from core.repr import ReprId, TokenReprId, VectorReprId
 
 
 class Task(Enum):
-    RECOGNITION = 'recognition'
     GENERATION = 'generation'
+    RECOGNITION = 'recognition'
     PRETRAINING_NTP = 'pretraining_ntp'
     RECOGNITION_SFT = 'recognition_sft'
     GENERATION_SFT = 'generation_sft'
@@ -25,7 +25,7 @@ class ModelId:
     def _get_repr_ids(cls, task: Task) -> list[ReprId]:
         token_repr_ids: list[ReprId] = TokenReprId.create_defaults()
         vector_repr_id: ReprId = VectorReprId.create_point5()
-        return token_repr_ids + [vector_repr_id]
+        return [vector_repr_id] + token_repr_ids
     
     @classmethod
     def create_task_model_ids(cls, task: Task) -> list[Self]:

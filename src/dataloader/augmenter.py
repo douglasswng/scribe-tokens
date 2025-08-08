@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 from core.data_schema import Parsed, DigitalInk
-from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA, AUGMENT_PROB, SHUFFLE_RANGE, REVERSE_RANGE
+from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA, AUGMENT_PROB
 
 
 def scale_coords(coords: list[np.ndarray], scale_factor: float) -> list[np.ndarray]:
@@ -58,7 +58,7 @@ class AugmenterConfig:
         self.rotate_angle = self._sample_arg(ROTATE_ANGLE, -ROTATE_ANGLE)
         self.jitter_sigma = self._sample_arg(JITTER_SIGMA)
 
-        self.reverse = random.random() <= REVERSE_RANGE
+        self.reverse = random.random() <= AUGMENT_PROB
 
     def _sample_arg(self, max_val: float, min_val: float=0, default: float=0) -> float:
         if random.random() <= AUGMENT_PROB:

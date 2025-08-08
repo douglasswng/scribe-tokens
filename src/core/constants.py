@@ -56,6 +56,4 @@ SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
 SHEAR_FACTOR = 0.5  # shear factor between (-SHEAR_FACTOR, SHEAR_FACTOR)
 ROTATE_ANGLE = 5  # rotate angle (degrees) between (-ROTATE_ANGLE, ROTATE_ANGLE)
 JITTER_SIGMA = 5  # the std of gaussian noise added to the points
-SHUFFLE_RANGE = 1.0  # probability a stroke is shuffled is between (0, SHUFFLE_RANGE)
-REVERSE_RANGE = 1.0  # probability a stroke is reversed is between (0, REVERSE_RANGE)
 AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, independently

@@ -46,38 +46,9 @@ def jitter_coords(coords: list[np.ndarray], sigma: float) -> list[np.ndarray]:
     return jittered_coords
 
 
-def shuffle_coords(coords: list[np.ndarray], shuffle_prob: float) -> list[np.ndarray]:
-    """Randomly shuffle the order of strokes."""
-    if shuffle_prob == 0 or len(coords) <= 1:
-        return coords
-    
-    shuffled_coords = coords.copy()
-    num_shuffled = int(len(coords) * shuffle_prob)
-    if num_shuffled <= 1:
-        return shuffled_coords
-    
-    shuffle_idxs = random.sample(range(len(coords)), num_shuffled)
-    strokes_to_shuffle = [shuffled_coords[i] for i in shuffle_idxs]
-    random.shuffle(strokes_to_shuffle)
-    
-    for i, shuffled_stroke in zip(shuffle_idxs, strokes_to_shuffle):
-        shuffled_coords[i] = shuffled_stroke
-    
-    return shuffled_coords
-
-
-def reverse_coords(coords: list[np.ndarray], reverse_prob: float) -> list[np.ndarray]:
-    """Reverse the coordinates within each stroke with some probability."""
-    if reverse_prob == 0:
-        return coords
-    
-    reversed_coords = []
-    for stroke_coords in coords:
-        if len(stroke_coords) > 1 and random.random() < reverse_prob:
-            reversed_coords.append(stroke_coords[::-1])
-        else:
-            reversed_coords.append(stroke_coords.copy())
-    return reversed_coords
+def reverse_coords(coords: list[np.ndarray]) -> list[np.ndarray]:
+    """Reverse the strokes and points within each stroke."""
+    return [stroke_coords[::-1] for stroke_coords in reversed(coords)]
 
 
 class AugmenterConfig:
@@ -86,8 +57,8 @@ class AugmenterConfig:
         self.shear_factor = self._sample_arg(SHEAR_FACTOR, -SHEAR_FACTOR)
         self.rotate_angle = self._sample_arg(ROTATE_ANGLE, -ROTATE_ANGLE)
         self.jitter_sigma = self._sample_arg(JITTER_SIGMA)
-        self.shuffle = self._sample_arg(SHUFFLE_RANGE)
-        self.reverse = self._sample_arg(REVERSE_RANGE)
+
+        self.reverse = random.random() <= REVERSE_RANGE
 
     def _sample_arg(self, max_val: float, min_val: float=0, default: float=0) -> float:
         if random.random() <= AUGMENT_PROB:
@@ -109,8 +80,9 @@ class Augmenter:
         np_coords = shear_coords(np_coords, cls._config.shear_factor)
         np_coords = rotate_coords(np_coords, cls._config.rotate_angle)
         np_coords = jitter_coords(np_coords, cls._config.jitter_sigma)
-        np_coords = shuffle_coords(np_coords, cls._config.shuffle)
-        np_coords = reverse_coords(np_coords, cls._config.reverse)
+
+        if cls._config.reverse:
+            np_coords = reverse_coords(np_coords)
         
         # Convert back to DigitalInk
         augmented_ink = DigitalInk.from_coords(np_coords)
@@ -140,7 +112,6 @@ if __name__ == "__main__":
     original_ink.visualise()
     augmented_ink.visualise()
 
-    print("Original length:", len(parsed.ink))
-    print("Augmented length:", len(augmented_parsed.ink))
+    print("Ink length:", len(parsed.ink))
     print("Original token count:", original_tensor.size(0))
     print("Augmented token count:", augmented_tensor.size(0))

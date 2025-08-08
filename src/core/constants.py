@@ -29,8 +29,8 @@ CHARS = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 NUM_CHARS = len(CHARS)  # 79
 
 # Experiment hyperparameters
-VOCAB_SIZE = 50000
-DELTA = 4
+VOCAB_SIZE = 32000
+DELTA = 8
 MAX_LEN = int(1e4)
 SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
@@ -41,10 +41,9 @@ NUM_LAYERS = 12
 NUM_HEADS = 6
 DROPOUT = 0.1
 NUM_MIXTURES = 20
-STD = 50  # the approximate std of the dx and dy values in the dataset
 
 # Training hyperparameters
-UNKNOWN_TOKEN_RATE = 0.002  # match the unknown rate on the validation set
+UNKNOWN_TOKEN_RATE = 0.002  # match the unknown rate on the validation set (~0.2% when DELTA=8, ~0.3% when DELTA=4)
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
 NUM_EPOCHS = 300

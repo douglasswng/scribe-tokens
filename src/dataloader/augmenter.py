@@ -46,14 +46,21 @@ def jitter_coords(coords: list[np.ndarray], sigma: float) -> list[np.ndarray]:
     return jittered_coords
 
 
+def reverse_coords(coords: list[np.ndarray]) -> list[np.ndarray]:
+    """Reverse the strokes and points within each stroke."""
+    return [stroke_coords[::-1] for stroke_coords in reversed(coords)]
+
+
 class AugmenterConfig:
     def __init__(self):
-        self.scale_factor = 1 + self._sample_arg(-SCALE_RANGE, SCALE_RANGE)
-        self.shear_factor = self._sample_arg(-SHEAR_FACTOR, SHEAR_FACTOR)
-        self.rotate_angle = self._sample_arg(-ROTATE_ANGLE, ROTATE_ANGLE)
-        self.jitter_sigma = self._sample_arg(0, JITTER_SIGMA)
+        self.scale_factor = 1 + self._sample_arg(SCALE_RANGE, -SCALE_RANGE)
+        self.shear_factor = self._sample_arg(SHEAR_FACTOR, -SHEAR_FACTOR)
+        self.rotate_angle = self._sample_arg(ROTATE_ANGLE, -ROTATE_ANGLE)
+        self.jitter_sigma = self._sample_arg(JITTER_SIGMA)
 
-    def _sample_arg(self, min_val: float, max_val: float, default: float=0) -> float:
+        self.reverse = random.random() <= AUGMENT_PROB
+
+    def _sample_arg(self, max_val: float, min_val: float=0, default: float=0) -> float:
         if random.random() <= AUGMENT_PROB:
             return random.uniform(min_val, max_val)
         return default
@@ -73,6 +80,9 @@ class Augmenter:
         np_coords = shear_coords(np_coords, cls._config.shear_factor)
         np_coords = rotate_coords(np_coords, cls._config.rotate_angle)
         np_coords = jitter_coords(np_coords, cls._config.jitter_sigma)
+
+        # if cls._config.reverse:
+        #     np_coords = reverse_coords(np_coords)
         
         # Convert back to DigitalInk
         augmented_ink = DigitalInk.from_coords(np_coords)
@@ -93,6 +103,15 @@ if __name__ == "__main__":
     augmented_parsed.visualise()
 
     repr_id = TokenReprId.create_scribe()
-    tensor = DefaultReprFactory.ink_to_tensor(repr_id, augmented_parsed.ink)
-    ink = DefaultReprFactory.tensor_to_ink(repr_id, tensor)
-    ink.visualise()
+
+    original_tensor = DefaultReprFactory.ink_to_tensor(repr_id, parsed.ink)
+    augmented_tensor = DefaultReprFactory.ink_to_tensor(repr_id, augmented_parsed.ink)
+
+    original_ink = DefaultReprFactory.tensor_to_ink(repr_id, original_tensor)
+    augmented_ink = DefaultReprFactory.tensor_to_ink(repr_id, augmented_tensor)
+    original_ink.visualise()
+    augmented_ink.visualise()
+
+    print("Ink length:", len(parsed.ink))
+    print("Original token count:", original_tensor.size(0))
+    print("Augmented token count:", augmented_tensor.size(0))

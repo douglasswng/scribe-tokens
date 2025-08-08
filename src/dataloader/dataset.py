@@ -1,5 +1,7 @@
 from pathlib import Path
 from functools import partial
+from collections import defaultdict
+import random
 
 from torch.utils.data import Dataset
 
@@ -15,14 +17,25 @@ class ParsedDataset(Dataset):
                  model_id: ModelId,
                  parsed_paths: list[Path],
                  augment: bool):
+        self._model_id = model_id
         self._parsed_paths = parsed_paths
         self._augment = augment
 
         self._repr_callable = partial(DefaultReprFactory.ink_to_tensor, model_id.repr_id)
         self._parsed_to_instance: dict[str, Instance] = {}  # for caching when no need to augment
+        if self._model_id.task.use_reference:
+            self._writer_idxs = self._build_writer_idxs()
 
     def __len__(self) -> int:
         return len(self._parsed_paths)
+
+    def _build_writer_idxs(self) -> defaultdict[str, set[int]]:
+        writer_idxs = defaultdict[str, set[int]](set)
+        for idx, parsed_path in enumerate(self._parsed_paths):
+            parsed = Parsed.from_path(parsed_path)
+            writer = parsed.writer
+            writer_idxs[writer].add(idx)
+        return writer_idxs
     
     def _get_parsed(self, idx: int) -> Parsed:
         parsed_path = self._parsed_paths[idx]
@@ -44,13 +57,21 @@ class ParsedDataset(Dataset):
             self._parsed_to_instance[parsed.id] = instance
         return self._parsed_to_instance[parsed.id]
     
-    def __getitem__(self, idx: int) -> Instance:
+    def __getitem__(self, idx: int) -> Instance | tuple[Instance, Instance]:
         if self._augment:
             Augmenter.reset_config()
 
-        parsed = self._get_parsed(idx)
-        instance = self._get_instance(parsed)
-        return instance
+        main_parsed = self._get_parsed(idx)
+        main_instance = self._get_instance(main_parsed)
+        if not self._model_id.task.use_reference:
+            return main_instance
+        
+        valid_ref_idxs = self._writer_idxs[main_parsed.writer] - {idx}
+        valid_ref_list = list(valid_ref_idxs)
+        ref_idx = random.choice(valid_ref_list) if valid_ref_list else idx
+        ref_parsed = self._get_parsed(ref_idx)
+        ref_instance = self._get_instance(ref_parsed)
+        return main_instance, ref_instance
     
 
 def create_datasets(model_id: ModelId, datasplit: DataSplit
@@ -75,7 +96,6 @@ if __name__ == "__main__":
             for _ in range(5):
                 start = time()
                 instance = train_dataset[0]
-                instance.parsed.visualise()
                 end = time()
                 print(f"Time taken: {end - start} seconds")
             print()

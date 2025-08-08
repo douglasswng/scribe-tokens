@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 
 from core.model import LocalModel, ModelId
-from core.data_schema import Batch, Instance, IdMapper
+from core.data_schema import Batch, Instance, IdMapper, SingletonBatch
 from model.modules.embedder import CharEmbedder, Embedder
 from model.modules.decoder import TransformerDecoder
 from model.models.loss_mixin import LossMixin
@@ -12,6 +12,7 @@ from model.models.batch_utils import BatchPreper
 class RecognitionModel(LocalModel, LossMixin):
     def __init__(self, model_id: ModelId, repr_embedder: Embedder, decoder: TransformerDecoder | None=None):
         super().__init__()
+        self._model_id = model_id
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
@@ -65,9 +66,10 @@ class RecognitionModel(LocalModel, LossMixin):
             return IdMapper.ids_to_str(generated_ids)
 
     def monitor(self, batch: Batch) -> None:
+        assert isinstance(batch, SingletonBatch)
         instance = batch.get_random_instance()
         text_pred = self.predict_text(instance)
-        instance.parsed.ink.visualise(name=text_pred)
+        instance.parsed.ink.visualise(name=f"{self._model_id}: {text_pred}")
 
 
 if __name__ == "__main__":
@@ -86,7 +88,7 @@ if __name__ == "__main__":
             persistent_workers=False,
         )
 
-        repr_embedder = ReprEmbedderFactory.create(model_id)
+        repr_embedder = ReprEmbedderFactory.create(model_id.repr_id)
         model = RecognitionModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()

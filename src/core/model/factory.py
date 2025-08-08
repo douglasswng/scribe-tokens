@@ -15,7 +15,6 @@ class ModelFactory(Protocol):
     @classmethod
     def create(cls, model_id: ModelId) -> Model:
         model = cls.create_local(model_id)
-        model.init_weights()
         if distributed_context.is_distributed:
             model = DistributedModel(model)
         return model

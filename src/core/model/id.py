@@ -6,11 +6,19 @@ from core.repr import ReprId, TokenReprId, VectorReprId
 
 
 class Task(Enum):
-    RECOGNITION = 'recognition'
     GENERATION = 'generation'
+    RECOGNITION = 'recognition'
     PRETRAINING_NTP = 'pretraining_ntp'
     RECOGNITION_SFT = 'recognition_sft'
     GENERATION_SFT = 'generation_sft'
+
+    @property
+    def is_sft(self) -> bool:
+        return self in {Task.RECOGNITION_SFT, Task.GENERATION_SFT}
+
+    @property
+    def use_reference(self) -> bool:
+        return self in {Task.GENERATION, Task.GENERATION_SFT}
 
 
 @dataclass(frozen=True)
@@ -22,14 +30,14 @@ class ModelId:
         return f"Task: {self.task.value}, Repr: {self.repr_id}"
     
     @classmethod
-    def _get_repr_ids(cls, task: Task) -> list[ReprId]:
+    def _get_repr_ids(cls) -> list[ReprId]:
         token_repr_ids: list[ReprId] = TokenReprId.create_defaults()
         vector_repr_id: ReprId = VectorReprId.create_point5()
-        return token_repr_ids + [vector_repr_id]
+        return  token_repr_ids + [vector_repr_id]
     
     @classmethod
     def create_task_model_ids(cls, task: Task) -> list[Self]:
-        return [cls(task=task, repr_id=repr_id) for repr_id in cls._get_repr_ids(task)]
+        return [cls(task=task, repr_id=repr_id) for repr_id in cls._get_repr_ids()]
 
     @classmethod
     def create_defaults(cls) -> list[Self]:

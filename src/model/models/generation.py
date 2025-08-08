@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 
 from core.model import LocalModel, ModelId
-from core.data_schema import Batch, DigitalInk, Instance
+from core.data_schema import Batch, DigitalInk, Instance, PairBatch
 from repr.factory import DefaultReprFactory
 from model.modules.embedder import Embedder, CharEmbedder, MDNOutput
 from model.modules.decoder import TransformerDecoder
@@ -20,8 +20,8 @@ class GenerationModel(LocalModel, LossMixin):
 
         self._decoder = decoder or TransformerDecoder()
 
-        self._repr_id = model_id.repr_id
-        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._repr_id)
+        self._model_id = model_id
+        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._model_id.repr_id)
         self._batch_preper = BatchPreper(task=model_id.task, repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 
     def _forward(self, input: Tensor) -> Tensor | MDNOutput:
@@ -53,7 +53,7 @@ class GenerationModel(LocalModel, LossMixin):
         batch_size = mixtures.size(0)
         batch_indices = torch.arange(batch_size)
 
-        mixture_probs = torch.softmax(mixtures / temperature, dim=-1)
+        mixture_probs = torch.softmax(torch.log(mixtures) / temperature, dim=-1)
         mixture_indices = torch.multinomial(mixture_probs, 1).squeeze(-1)
 
         selected_means = means[batch_indices, mixture_indices]  # [batch_size, 2]
@@ -62,10 +62,10 @@ class GenerationModel(LocalModel, LossMixin):
 
         return selected_means, selected_stds, selected_rhos
     
-    def _sample_xy(self, means: Tensor, stds: Tensor, rhos: Tensor) -> tuple[Tensor, Tensor]:
+    def _sample_xy(self, means: Tensor, stds: Tensor, rhos: Tensor, temperature: float = 1.0) -> tuple[Tensor, Tensor]:
         batch_size = means.size(0)
         
-        std_x, std_y = stds[:, 0], stds[:, 1]
+        std_x, std_y = stds[:, 0] * temperature, stds[:, 1] * temperature
         z = torch.randn(batch_size, 2).to(means.device)
 
         x = means[:, 0] + std_x * z[:, 0]
@@ -86,7 +86,7 @@ class GenerationModel(LocalModel, LossMixin):
 
         selected_means, selected_stds, selected_rhos = self._sample_mixture(
             mixtures, means, stds, rhos, temperature)
-        x, y = self._sample_xy(selected_means, selected_stds, selected_rhos)
+        x, y = self._sample_xy(selected_means, selected_stds, selected_rhos, temperature)
 
         pen_up, pen_down, end_stroke = self._sample_pen_state(pen_states, temperature)
         
@@ -111,7 +111,8 @@ class GenerationModel(LocalModel, LossMixin):
         has_eos = torch.any(gen_tensors == eos, dim=1)
         return bool(has_eos.all())
         
-    def generate_inks(self, instance: Instance,
+    def generate_inks(self, main_instance: Instance,
+                      ref_instance: Instance,
                       num_gen: int = 1,
                       temperature: float = 1.0,
                       max_len: int = 500) -> list[DigitalInk]:
@@ -119,13 +120,16 @@ class GenerationModel(LocalModel, LossMixin):
             raise ValueError("Generation is not supported in training mode")
         
         with torch.no_grad():
-            char_embedded = self._char_embedder.embed(instance.char)
-            static_input = char_embedded.unsqueeze(0).expand(num_gen, -1, -1)
+            ref_repr_embedded = self._repr_embedder.embed(ref_instance.repr)
+            ref_char_embedded = self._char_embedder.embed(ref_instance.char)
+            main_char_embedded = self._char_embedder.embed(main_instance.char)
+            static_input = torch.cat([ref_repr_embedded, ref_char_embedded, main_char_embedded], dim=0)
+            static_input = static_input.unsqueeze(0).expand(num_gen, -1, -1)
 
-            if self._repr_id.is_token:
-                gen_tensors = instance.repr_bos.unsqueeze(0).expand(num_gen, -1)
+            if self._model_id.repr_id.is_token:
+                gen_tensors = main_instance.repr_bos.unsqueeze(0).expand(num_gen, -1)
             else:
-                gen_tensors = instance.repr_bos.unsqueeze(0).unsqueeze(0).expand(num_gen, -1, -1)
+                gen_tensors = main_instance.repr_bos.unsqueeze(0).unsqueeze(0).expand(num_gen, -1, -1)
 
             for _ in range(max_len):
                 next_tensor = self._generate_next_tensor(
@@ -136,16 +140,17 @@ class GenerationModel(LocalModel, LossMixin):
                 
                 gen_tensors = torch.cat([gen_tensors, next_tensor], dim=1)
 
-                if self._terminate_generation(gen_tensors, instance.repr_eos):
+                if self._terminate_generation(gen_tensors, main_instance.repr_eos):
                     break
 
             inks = [self._ink_callable(tensor=gen_tensor) for gen_tensor in gen_tensors]
             return inks
     
     def monitor(self, batch: Batch) -> None:
-        instance = batch.get_random_instance()
-        ink = self.generate_inks(instance=instance)[0]
-        ink.visualise(name=instance.parsed.text)
+        assert isinstance(batch, PairBatch)
+        main_instance, ref_instance = batch.get_random_instance_pair()
+        gen_ink = self.generate_inks(main_instance=main_instance, ref_instance=ref_instance)[0]
+        gen_ink.visualise(name=f"{self._model_id}: {main_instance.parsed.text}")
 
         
 if __name__ == "__main__":
@@ -154,7 +159,7 @@ if __name__ == "__main__":
     from model.factory import ReprEmbedderFactory
     from core.utils import distributed_context
 
-    for model_id in ModelId.create_task_model_ids(Task.GENERATION)[::-1]:
+    for model_id in ModelId.create_task_model_ids(Task.GENERATION)[::]:
         print(model_id)
         train_loader, val_loader, test_loader = create_dataloaders(
             model_id=model_id,
@@ -164,7 +169,7 @@ if __name__ == "__main__":
             persistent_workers=False,
         )
 
-        repr_embedder = ReprEmbedderFactory.create(model_id)
+        repr_embedder = ReprEmbedderFactory.create(model_id.repr_id)
         model = GenerationModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()

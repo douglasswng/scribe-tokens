@@ -40,7 +40,8 @@ class DefaultModelFactory(ModelFactory):
                 local_model = cls._create_gen_sft(model_id)
             case _:
                 raise ValueError(f"Unknown model id: {model_id}")
-            
+        if not model_id.task.is_sft:
+            local_model.init_weights()
         return local_model.to(distributed_context.device)
 
     @classmethod

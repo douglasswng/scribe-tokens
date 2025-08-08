@@ -86,7 +86,6 @@ class AugmenterConfig:
         self.shear_factor = self._sample_arg(SHEAR_FACTOR, -SHEAR_FACTOR)
         self.rotate_angle = self._sample_arg(ROTATE_ANGLE, -ROTATE_ANGLE)
         self.jitter_sigma = self._sample_arg(JITTER_SIGMA)
-
         self.shuffle = self._sample_arg(SHUFFLE_RANGE)
         self.reverse = self._sample_arg(REVERSE_RANGE)
 

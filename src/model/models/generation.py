@@ -53,7 +53,7 @@ class GenerationModel(LocalModel, LossMixin):
         batch_size = mixtures.size(0)
         batch_indices = torch.arange(batch_size)
 
-        mixture_probs = torch.softmax(mixtures / temperature, dim=-1)
+        mixture_probs = torch.softmax(torch.log(mixtures) / temperature, dim=-1)
         mixture_indices = torch.multinomial(mixture_probs, 1).squeeze(-1)
 
         selected_means = means[batch_indices, mixture_indices]  # [batch_size, 2]
@@ -62,10 +62,10 @@ class GenerationModel(LocalModel, LossMixin):
 
         return selected_means, selected_stds, selected_rhos
     
-    def _sample_xy(self, means: Tensor, stds: Tensor, rhos: Tensor) -> tuple[Tensor, Tensor]:
+    def _sample_xy(self, means: Tensor, stds: Tensor, rhos: Tensor, temperature: float = 1.0) -> tuple[Tensor, Tensor]:
         batch_size = means.size(0)
         
-        std_x, std_y = stds[:, 0], stds[:, 1]
+        std_x, std_y = stds[:, 0] * temperature, stds[:, 1] * temperature
         z = torch.randn(batch_size, 2).to(means.device)
 
         x = means[:, 0] + std_x * z[:, 0]
@@ -86,7 +86,7 @@ class GenerationModel(LocalModel, LossMixin):
 
         selected_means, selected_stds, selected_rhos = self._sample_mixture(
             mixtures, means, stds, rhos, temperature)
-        x, y = self._sample_xy(selected_means, selected_stds, selected_rhos)
+        x, y = self._sample_xy(selected_means, selected_stds, selected_rhos, temperature)
 
         pen_up, pen_down, end_stroke = self._sample_pen_state(pen_states, temperature)
         
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     from model.factory import ReprEmbedderFactory
     from core.utils import distributed_context
 
-    for model_id in ModelId.create_task_model_ids(Task.GENERATION)[::-1]:
+    for model_id in ModelId.create_task_model_ids(Task.GENERATION)[::]:
         print(model_id)
         train_loader, val_loader, test_loader = create_dataloaders(
             model_id=model_id,
@@ -164,7 +164,7 @@ if __name__ == "__main__":
             persistent_workers=False,
         )
 
-        repr_embedder = ReprEmbedderFactory.create(model_id)
+        repr_embedder = ReprEmbedderFactory.create(model_id.repr_id)
         model = GenerationModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()

@@ -86,7 +86,7 @@ if __name__ == "__main__":
             persistent_workers=False,
         )
 
-        repr_embedder = ReprEmbedderFactory.create(model_id)
+        repr_embedder = ReprEmbedderFactory.create(model_id.repr_id)
         model = RecognitionModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()

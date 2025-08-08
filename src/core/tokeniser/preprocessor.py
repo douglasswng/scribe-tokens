@@ -24,13 +24,13 @@ class DeltaSmoothPreprocessor(DeltaPreprocessor):
                  downsample_factor: int,
                  smooth_window_length: int=7,
                  smooth_polyorder: int=3):
-        self._delta = delta
+        super().__init__(delta)
         self._downsample_factor = downsample_factor
         self._smooth_window_length = smooth_window_length
         self._smooth_polyorder = smooth_polyorder
 
     def postprocess(self, digital_ink: DigitalInk[int]) -> DigitalInk:
-        digital_ink = digital_ink.scale(self._delta)
+        digital_ink = super().postprocess(digital_ink)
         digital_ink = digital_ink.downsample(factor=self._downsample_factor)
         digital_ink = digital_ink.smooth(window_length=self._smooth_window_length, polyorder=self._smooth_polyorder)
         return digital_ink

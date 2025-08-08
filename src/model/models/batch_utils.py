@@ -78,7 +78,7 @@ class BatchPreper:
         if ref_target.dtype in {torch.int, torch.long}:
             return self._create_bool_mask(orig_target, value=False).int()
 
-        assert ref_target.dtype == torch.float, f"{ref_target.dtype=}"
+        assert ref_target.dtype == torch.float
 
         ref_dim = ref_target.shape[-1]
 

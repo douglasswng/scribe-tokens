@@ -44,7 +44,7 @@ class VectorEmbedder(Embedder):
 
         mixtures = torch.softmax(mixtures, dim=-1)
         means = means.view(*means.size()[:-1], NUM_MIXTURES, 2)
-        stds = F.softplus(stds.view(*stds.size()[:-1], NUM_MIXTURES, 2)) + 0.01
+        stds = F.softplus(stds.view(*stds.size()[:-1], NUM_MIXTURES, 2)) + 0.1
         rhos = torch.tanh(rhos) * 0.99
 
         return mixtures, means, stds, rhos, pen_states

@@ -20,8 +20,8 @@ class GenerationModel(LocalModel, LossMixin):
 
         self._decoder = decoder or TransformerDecoder()
 
-        self._repr_id = model_id.repr_id
-        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._repr_id)
+        self._model_id = model_id
+        self._ink_callable = partial(DefaultReprFactory.tensor_to_ink, id=self._model_id.repr_id)
         self._batch_preper = BatchPreper(task=model_id.task, repr_embedder=repr_embedder, char_embedder=self._char_embedder)
 
     def _forward(self, input: Tensor) -> Tensor | MDNOutput:
@@ -122,7 +122,7 @@ class GenerationModel(LocalModel, LossMixin):
             char_embedded = self._char_embedder.embed(instance.char)
             static_input = char_embedded.unsqueeze(0).expand(num_gen, -1, -1)
 
-            if self._repr_id.is_token:
+            if self._model_id.repr_id.is_token:
                 gen_tensors = instance.repr_bos.unsqueeze(0).expand(num_gen, -1)
             else:
                 gen_tensors = instance.repr_bos.unsqueeze(0).unsqueeze(0).expand(num_gen, -1, -1)
@@ -145,7 +145,7 @@ class GenerationModel(LocalModel, LossMixin):
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
         ink = self.generate_inks(instance=instance)[0]
-        ink.visualise(name=instance.parsed.text)
+        ink.visualise(name=f"{self._model_id.repr_id.type.value}: {instance.parsed.text}")
 
         
 if __name__ == "__main__":

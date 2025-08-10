@@ -27,7 +27,6 @@ CHARS = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
          + "0123456789"
          + " !\"#%&'()+,-./:;?")
 NUM_CHARS = len(CHARS)  # 79
-STD = 50  # approximate std of dx and dy, used for normalisation
 
 # Experiment hyperparameters
 VOCAB_SIZE = 32000
@@ -47,7 +46,7 @@ NUM_MIXTURES = 20
 UNKNOWN_TOKEN_RATE = 0.002  # match the unknown rate on the validation set (~0.2% when DELTA=8, ~0.3% when DELTA=4)
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
-NUM_EPOCHS = 200
+NUM_EPOCHS = 400
 PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs
 WEIGHT_DECAY = 0.1
 

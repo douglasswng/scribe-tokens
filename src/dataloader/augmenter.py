@@ -81,8 +81,8 @@ class Augmenter:
         np_coords = rotate_coords(np_coords, cls._config.rotate_angle)
         np_coords = jitter_coords(np_coords, cls._config.jitter_sigma)
 
-        if cls._config.reverse:
-            np_coords = reverse_coords(np_coords)
+        # if cls._config.reverse:
+        #     np_coords = reverse_coords(np_coords)
         
         # Convert back to DigitalInk
         augmented_ink = DigitalInk.from_coords(np_coords)

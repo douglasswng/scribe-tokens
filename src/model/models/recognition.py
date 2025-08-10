@@ -12,6 +12,7 @@ from model.models.batch_utils import BatchPreper
 class RecognitionModel(LocalModel, LossMixin):
     def __init__(self, model_id: ModelId, repr_embedder: Embedder, decoder: TransformerDecoder | None=None):
         super().__init__()
+        self._model_id = model_id
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
 
@@ -67,7 +68,7 @@ class RecognitionModel(LocalModel, LossMixin):
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
         text_pred = self.predict_text(instance)
-        instance.parsed.ink.visualise(name=text_pred)
+        instance.parsed.ink.visualise(name=f"{self._model_id.task.value}: {text_pred}")
 
 
 if __name__ == "__main__":

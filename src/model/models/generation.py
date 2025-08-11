@@ -123,8 +123,7 @@ class GenerationModel(LocalModel, LossMixin):
             ref_repr_embedded = self._repr_embedder.embed(ref_instance.repr)
             ref_char_embedded = self._char_embedder.embed(ref_instance.char)
             main_char_embedded = self._char_embedder.embed(main_instance.char)
-            main_repr_embedded = self._repr_embedder.embed(main_instance.repr)
-            static_input = torch.cat([ref_repr_embedded, ref_char_embedded, main_char_embedded, main_repr_embedded], dim=1)
+            static_input = torch.cat([ref_repr_embedded, ref_char_embedded, main_char_embedded], dim=0)
             static_input = static_input.unsqueeze(0).expand(num_gen, -1, -1)
 
             if self._model_id.repr_id.is_token:

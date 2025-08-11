@@ -61,10 +61,11 @@ class BatchPreper:
         return inputs, targets, masks
 
     def _prepare_gen_batch(self, batch: PairBatch) -> tuple[Tensor, Tensor, Tensor]:
-        main_char_embeddings = [self._char_embedder.embed(inst.char) for inst in batch.main_instances]
+        ref_repr_embeddings = [self._repr_embedder.embed(inst.repr) for inst in batch.ref_instances]
         ref_char_embeddings = [self._char_embedder.embed(inst.char) for inst in batch.ref_instances]
-        main_repr_embeddings = [self._repr_embedder.embed(inst.repr) for inst in batch.main_instances]
-        ref_repr_embeddings = [self._repr_embedder.embed(inst.repr_input) for inst in batch.ref_instances]
+        main_char_embeddings = [self._char_embedder.embed(inst.char) for inst in batch.main_instances]
+        main_repr_embeddings = [self._repr_embedder.embed(inst.repr_input) for inst in batch.main_instances]
+        
         inputs = self._concat_and_pad(ref_repr_embeddings, ref_char_embeddings, main_char_embeddings, main_repr_embeddings)
         
         ref_repr_targets = [self._create_empty_target(inst.repr, inst.repr)

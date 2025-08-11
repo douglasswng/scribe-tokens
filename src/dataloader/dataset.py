@@ -67,7 +67,8 @@ class ParsedDataset(Dataset):
             return main_instance
         
         valid_ref_idxs = self._writer_idxs[main_parsed.writer] - {idx}
-        ref_idx = random.choice(list(valid_ref_idxs))
+        valid_ref_list = list(valid_ref_idxs)
+        ref_idx = random.choice(valid_ref_list) if valid_ref_list else idx
         ref_parsed = self._get_parsed(ref_idx)
         ref_instance = self._get_instance(ref_parsed)
         return main_instance, ref_instance

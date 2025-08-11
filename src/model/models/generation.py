@@ -151,7 +151,7 @@ class GenerationModel(LocalModel, LossMixin):
         assert isinstance(batch, PairBatch)
         main_instance, ref_instance = batch.get_random_instance_pair()
         gen_ink = self.generate_inks(main_instance=main_instance, ref_instance=ref_instance)[0]
-        gen_ink.visualise(name=f"{self._model_id.repr_id.type.value}: {main_instance.parsed.text}")
+        gen_ink.visualise(name=f"{self._model_id}: {main_instance.parsed.text}")
 
         
 if __name__ == "__main__":

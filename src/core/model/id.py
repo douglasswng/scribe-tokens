@@ -16,6 +16,10 @@ class Task(Enum):
     def is_sft(self) -> bool:
         return self in {Task.RECOGNITION_SFT, Task.GENERATION_SFT}
 
+    @property
+    def use_reference(self) -> bool:
+        return self in {Task.GENERATION, Task.GENERATION_SFT}
+
 
 @dataclass(frozen=True)
 class ModelId:

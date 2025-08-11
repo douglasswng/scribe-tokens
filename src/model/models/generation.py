@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 
 from core.model import LocalModel, ModelId
-from core.data_schema import Batch, DigitalInk, Instance
+from core.data_schema import Batch, DigitalInk, Instance, PairBatch
 from repr.factory import DefaultReprFactory
 from model.modules.embedder import Embedder, CharEmbedder, MDNOutput
 from model.modules.decoder import TransformerDecoder
@@ -111,7 +111,8 @@ class GenerationModel(LocalModel, LossMixin):
         has_eos = torch.any(gen_tensors == eos, dim=1)
         return bool(has_eos.all())
         
-    def generate_inks(self, instance: Instance,
+    def generate_inks(self, main_instance: Instance,
+                      ref_instance: Instance,
                       num_gen: int = 1,
                       temperature: float = 1.0,
                       max_len: int = 500) -> list[DigitalInk]:
@@ -119,13 +120,17 @@ class GenerationModel(LocalModel, LossMixin):
             raise ValueError("Generation is not supported in training mode")
         
         with torch.no_grad():
-            char_embedded = self._char_embedder.embed(instance.char)
-            static_input = char_embedded.unsqueeze(0).expand(num_gen, -1, -1)
+            ref_repr_embedded = self._repr_embedder.embed(ref_instance.repr)
+            ref_char_embedded = self._char_embedder.embed(ref_instance.char)
+            main_char_embedded = self._char_embedder.embed(main_instance.char)
+            main_repr_embedded = self._repr_embedder.embed(main_instance.repr)
+            static_input = torch.cat([ref_repr_embedded, ref_char_embedded, main_char_embedded, main_repr_embedded], dim=1)
+            static_input = static_input.unsqueeze(0).expand(num_gen, -1, -1)
 
             if self._model_id.repr_id.is_token:
-                gen_tensors = instance.repr_bos.unsqueeze(0).expand(num_gen, -1)
+                gen_tensors = main_instance.repr_bos.unsqueeze(0).expand(num_gen, -1)
             else:
-                gen_tensors = instance.repr_bos.unsqueeze(0).unsqueeze(0).expand(num_gen, -1, -1)
+                gen_tensors = main_instance.repr_bos.unsqueeze(0).unsqueeze(0).expand(num_gen, -1, -1)
 
             for _ in range(max_len):
                 next_tensor = self._generate_next_tensor(
@@ -136,16 +141,17 @@ class GenerationModel(LocalModel, LossMixin):
                 
                 gen_tensors = torch.cat([gen_tensors, next_tensor], dim=1)
 
-                if self._terminate_generation(gen_tensors, instance.repr_eos):
+                if self._terminate_generation(gen_tensors, main_instance.repr_eos):
                     break
 
             inks = [self._ink_callable(tensor=gen_tensor) for gen_tensor in gen_tensors]
             return inks
     
     def monitor(self, batch: Batch) -> None:
-        instance = batch.get_random_instance()
-        ink = self.generate_inks(instance=instance)[0]
-        ink.visualise(name=f"{self._model_id.repr_id.type.value}: {instance.parsed.text}")
+        assert isinstance(batch, PairBatch)
+        main_instance, ref_instance = batch.get_random_instance_pair()
+        gen_ink = self.generate_inks(main_instance=main_instance, ref_instance=ref_instance)[0]
+        gen_ink.visualise(name=f"{self._model_id.repr_id.type.value}: {main_instance.parsed.text}")
 
         
 if __name__ == "__main__":

@@ -2,9 +2,9 @@ import torch
 from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 
-from core.data_schema import Batch, SingletonBatch, PairBatch
+from core.data_schema import Batch, PairBatch, SingletonBatch
 from core.model import Task
-from model.modules.embedder import Embedder, CharEmbedder
+from model.modules.embedder import CharEmbedder, Embedder
 
 
 class BatchPreper:
@@ -46,43 +46,57 @@ class BatchPreper:
     def _prepare_recog_batch(self, batch: SingletonBatch) -> tuple[Tensor, Tensor, Tensor]:
         repr_embeddings = [self._repr_embedder.embed(inst.repr) for inst in batch.instances]
         char_embeddings = [self._char_embedder.embed(inst.char_input) for inst in batch.instances]
-        
+
         inputs = self._concat_and_pad(repr_embeddings, char_embeddings)
-        
-        repr_targets = [self._create_empty_target(inst.repr, inst.char_target)
-                        for inst in batch.instances]
+
+        repr_targets = [
+            self._create_empty_target(inst.repr, inst.char_target) for inst in batch.instances
+        ]
         char_targets = [inst.char_target for inst in batch.instances]
         targets = self._concat_and_pad(repr_targets, char_targets)
-        
+
         repr_masks = [self._create_bool_mask(tgt, value=False) for tgt in repr_targets]
         char_masks = [self._create_bool_mask(tgt, value=True) for tgt in char_targets]
         masks = self._concat_and_pad(repr_masks, char_masks)
-        
+
         return inputs, targets, masks
 
     def _prepare_gen_batch(self, batch: PairBatch) -> tuple[Tensor, Tensor, Tensor]:
         ref_repr_embeddings = [self._repr_embedder.embed(inst.repr) for inst in batch.ref_instances]
         ref_char_embeddings = [self._char_embedder.embed(inst.char) for inst in batch.ref_instances]
-        main_char_embeddings = [self._char_embedder.embed(inst.char) for inst in batch.main_instances]
-        main_repr_embeddings = [self._repr_embedder.embed(inst.repr_input) for inst in batch.main_instances]
-        
-        inputs = self._concat_and_pad(ref_repr_embeddings, ref_char_embeddings, main_char_embeddings, main_repr_embeddings)
-        
-        ref_repr_targets = [self._create_empty_target(inst.repr, inst.repr)
-                            for inst in batch.ref_instances]
-        ref_char_targets = [self._create_empty_target(inst.char, inst.repr)
-                            for inst in batch.ref_instances]
-        main_char_targets = [self._create_empty_target(inst.char, inst.repr)
-                            for inst in batch.main_instances]
-        main_repr_targets = [inst.repr_target for inst in batch.main_instances]    
-        targets = self._concat_and_pad(ref_repr_targets, ref_char_targets, main_char_targets, main_repr_targets)
-        
+        main_char_embeddings = [
+            self._char_embedder.embed(inst.char) for inst in batch.main_instances
+        ]
+        main_repr_embeddings = [
+            self._repr_embedder.embed(inst.repr_input) for inst in batch.main_instances
+        ]
+
+        inputs = self._concat_and_pad(
+            ref_repr_embeddings, ref_char_embeddings, main_char_embeddings, main_repr_embeddings
+        )
+
+        ref_repr_targets = [
+            self._create_empty_target(inst.repr, inst.repr) for inst in batch.ref_instances
+        ]
+        ref_char_targets = [
+            self._create_empty_target(inst.char, inst.repr) for inst in batch.ref_instances
+        ]
+        main_char_targets = [
+            self._create_empty_target(inst.char, inst.repr) for inst in batch.main_instances
+        ]
+        main_repr_targets = [inst.repr_target for inst in batch.main_instances]
+        targets = self._concat_and_pad(
+            ref_repr_targets, ref_char_targets, main_char_targets, main_repr_targets
+        )
+
         ref_repr_masks = [self._create_bool_mask(tgt, value=False) for tgt in ref_repr_targets]
         ref_char_masks = [self._create_bool_mask(tgt, value=False) for tgt in ref_char_targets]
         main_char_masks = [self._create_bool_mask(tgt, value=False) for tgt in main_char_targets]
         main_repr_masks = [self._create_bool_mask(tgt, value=True) for tgt in main_repr_targets]
-        masks = self._concat_and_pad(ref_repr_masks, ref_char_masks, main_char_masks, main_repr_masks)
-        
+        masks = self._concat_and_pad(
+            ref_repr_masks, ref_char_masks, main_char_masks, main_repr_masks
+        )
+
         return inputs, targets, masks
 
     def _create_empty_target(self, orig_target: Tensor, ref_target: Tensor) -> Tensor:
@@ -105,8 +119,7 @@ class BatchPreper:
             return torch.zeros(tensor.shape[0], dtype=torch.bool).to(self._device)
 
     def _concat_and_pad(self, *vector_lists: list[Tensor]) -> Tensor:
-        combined = [torch.cat(tensors, dim=0) 
-                    for tensors in zip(*vector_lists)]
+        combined = [torch.cat(tensors, dim=0) for tensors in zip(*vector_lists)]
         return self._pad_tensors(combined)
 
     def _pad_tensors(self, tensors: list[Tensor]) -> Tensor:

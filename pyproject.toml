@@ -1,0 +1,28 @@
+[project]
+name = "scribe-tokens"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "mlflow>=3.8.1",
+    "numpy>=2.4.1",
+    "pydantic>=2.12.5",
+    "scipy>=1.17.0",
+    "swanlab>=0.7.6",
+    "tokenizers>=0.22.2",
+    "torch>=2.10.0",
+    "ujson>=5.11.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.13",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "PLC0415"]

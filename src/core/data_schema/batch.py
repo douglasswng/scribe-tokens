@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import random
+from dataclasses import dataclass
 
 from core.data_schema.instance import Instance
 

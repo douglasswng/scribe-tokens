@@ -1,11 +1,12 @@
+from core.utils.distributed_context import distributed_context
+
+from core.model import LocalModel, ModelFactory, ModelId, Task
 from core.repr import ReprId, VectorReprId
-from core.model import ModelFactory, ModelId, Task, LocalModel
-from tokeniser.factory import DefaultTokeniserFactory
-from model.models.recognition import RecognitionModel
+from ink_tokeniser.factory import DefaultTokeniserFactory
 from model.models.generation import GenerationModel
 from model.models.pretraining import PretrainingModel
+from model.models.recognition import RecognitionModel
 from model.modules.embedder import Embedder, TokenEmbedder, VectorEmbedder
-from core.utils.distributed_context import distributed_context
 
 
 class ReprEmbedderFactory:
@@ -55,18 +56,22 @@ class DefaultModelFactory(ModelFactory):
     def _create_recog_sft(cls, model_id: ModelId) -> LocalModel:
         pretrain_model = cls._load_pretraining_model(model_id)
         base_model_id = ModelId(task=Task.RECOGNITION, repr_id=model_id.repr_id)
-        recog_model = RecognitionModel(model_id=base_model_id,
-                                       repr_embedder=pretrain_model.repr_embedder,
-                                       decoder=pretrain_model.decoder)
+        recog_model = RecognitionModel(
+            model_id=base_model_id,
+            repr_embedder=pretrain_model.repr_embedder,
+            decoder=pretrain_model.decoder,
+        )
         return recog_model
 
     @classmethod
     def _create_gen_sft(cls, model_id: ModelId) -> LocalModel:
         pretrain_model = cls._load_pretraining_model(model_id)
         base_model_id = ModelId(task=Task.GENERATION, repr_id=model_id.repr_id)
-        gen_model = GenerationModel(model_id=base_model_id,
-                                    repr_embedder=pretrain_model.repr_embedder,
-                                    decoder=pretrain_model.decoder)
+        gen_model = GenerationModel(
+            model_id=base_model_id,
+            repr_embedder=pretrain_model.repr_embedder,
+            decoder=pretrain_model.decoder,
+        )
         return gen_model
 
 
@@ -75,4 +80,6 @@ if __name__ == "__main__":
         model = DefaultModelFactory.create(model_id)
         param_count = model.num_params
         embedding_param_count = model.num_embedding_params
-        print(f"Model has {float(param_count)/1e6:.2f}M params (Embedding params: {float(embedding_param_count)/1e6:.2f}M)")
+        print(
+            f"Model has {float(param_count) / 1e6:.2f}M params (Embedding params: {float(embedding_param_count) / 1e6:.2f}M)"
+        )

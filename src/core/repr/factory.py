@@ -2,9 +2,9 @@ from typing import Protocol
 
 from torch import Tensor
 
+from core.data_schema import DigitalInk
 from core.repr.id import ReprId
 from core.repr.repr import Repr
-from core.data_schema import DigitalInk
 
 
 class ReprFactory(Protocol):

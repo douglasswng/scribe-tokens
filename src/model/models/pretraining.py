@@ -1,7 +1,8 @@
-from core.model import ModelId
-from model.modules.embedder import Embedder
-from model.modules.decoder import TransformerDecoder
+from core.data_schema import Batch, SingletonBatch
+from core.model import ModelId, Tracker
 from model.models.generation import GenerationModel
+from model.modules.decoder import TransformerDecoder
+from model.modules.embedder import Embedder
 
 
 class PretrainingModel(GenerationModel):
@@ -16,12 +17,20 @@ class PretrainingModel(GenerationModel):
     def repr_embedder(self) -> Embedder:
         return self._repr_embedder
 
-        
+    def monitor(self, batch: Batch, tracker: Tracker | None = None) -> None:
+        assert isinstance(batch, SingletonBatch)
+        main_instance = batch.get_random_instance()
+        gen_ink = self.generate_inks(main_instance=main_instance)[0]
+        main_text = main_instance.parsed.text
+        self._monitor_ink(gen_ink, "Generated", main_text, tracker)
+
+
 if __name__ == "__main__":
-    from core.model import Task, ModelId
+    from core.utils import distributed_context
+
+    from core.model import ModelId, Task
     from dataloader.create import create_dataloaders
     from model.factory import ReprEmbedderFactory
-    from core.utils import distributed_context
 
     for model_id in ModelId.create_task_model_ids(Task.PRETRAINING_NTP)[::-1]:
         print(model_id)
@@ -34,7 +43,9 @@ if __name__ == "__main__":
         )
 
         repr_embedder = ReprEmbedderFactory.create(model_id.repr_id)
-        model = PretrainingModel(model_id=model_id, repr_embedder=repr_embedder).to(distributed_context.device)
+        model = PretrainingModel(model_id=model_id, repr_embedder=repr_embedder).to(
+            distributed_context.device
+        )
         for batch in train_loader:
             model.train()
             losses = model.losses(batch)

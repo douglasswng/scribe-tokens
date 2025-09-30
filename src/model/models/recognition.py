@@ -1,8 +1,8 @@
 import torch
 from torch import Tensor
 
-from core.model import LocalModel, ModelId
-from core.data_schema import Batch, Instance, IdMapper, SingletonBatch
+from core.model import LocalModel, ModelId, Tracker
+from core.data_schema import Batch, Instance, IdMapper, SingletonBatch, DigitalInk
 from model.modules.embedder import CharEmbedder, Embedder
 from model.modules.decoder import TransformerDecoder
 from model.models.loss_mixin import LossMixin
@@ -65,11 +65,17 @@ class RecognitionModel(LocalModel, LossMixin):
 
             return IdMapper.ids_to_str(generated_ids)
 
-    def monitor(self, batch: Batch) -> None:
+    def monitor(self, batch: Batch, tracker: Tracker | None=None) -> None:
         assert isinstance(batch, SingletonBatch)
         instance = batch.get_random_instance()
         text_pred = self.predict_text(instance)
-        instance.parsed.ink.visualise(name=f"{self._model_id}: {text_pred}")
+        text_true = instance.parsed.text
+        self._monitor_ink(instance.parsed.ink, "OCR", f"True: {text_true} | Pred: {text_pred}", tracker)
+
+    def _monitor_ink(self, ink: DigitalInk, task: str, caption: str, tracker: Tracker | None=None) -> None:
+        ink.visualise(name=f"{task}: {caption}")
+        if tracker is not None:
+            tracker.log_image(ink.to_image(), task, caption)
 
 
 if __name__ == "__main__":

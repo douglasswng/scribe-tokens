@@ -1,9 +1,13 @@
 from typing import overload
+import io
 
 from pydantic import BaseModel
 from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 from scipy.signal import savgol_filter
 import numpy as np
+from PIL import Image
 
 from core.constants import TMP_DIR
 
@@ -95,6 +99,22 @@ class Stroke[T: (float, int)](BaseModel):
         smoothed_points = [Point(x=float(x), y=float(y)) for x, y in zip(smoothed_x, smoothed_y)]
         return Stroke(points=smoothed_points)
 
+    def flip_y(self) -> 'Stroke':
+        return Stroke(points=[Point(x=point.x, y=-point.y) for point in self.points])
+
+    def scale_x(self, scale: float) -> 'Stroke':
+        return Stroke(points=[Point(x=point.x * scale, y=point.y) for point in self.points])
+    
+    def scale_y(self, scale: float) -> 'Stroke':
+        return Stroke(points=[Point(x=point.x, y=point.y * scale) for point in self.points])
+    
+    def dedup(self) -> 'Stroke':
+        deduped_points = [self.points[0]]
+        for point in self.points[1:]:
+            if point != deduped_points[-1]:
+                deduped_points.append(point)
+        return Stroke(points=deduped_points)
+
 
 class DigitalInk[T: (float, int)](BaseModel):
     strokes: list[Stroke[T]]
@@ -141,8 +161,37 @@ class DigitalInk[T: (float, int)](BaseModel):
         ]
         return cls.from_coords(raw_strokes)
 
+    @property
+    def bbox(self) -> tuple[Point, Point]:
+        min_x = min(point.x for stroke in self.strokes for point in stroke.points)
+        min_y = min(point.y for stroke in self.strokes for point in stroke.points)
+        max_x = max(point.x for stroke in self.strokes for point in stroke.points)
+        max_y = max(point.y for stroke in self.strokes for point in stroke.points)
+        return Point(x=min_x, y=min_y), Point(x=max_x, y=max_y)
+
+    @property
+    def height(self) -> float:
+        top_left, bottom_right = self.bbox
+        return bottom_right.y - top_left.y
+
+    @property
+    def width(self) -> float:
+        top_left, bottom_right = self.bbox
+        return bottom_right.x - top_left.x
+
     def to_coords(self) -> list[list[tuple[float, float]]]:
         return [[(point.x, point.y) for point in stroke.points] for stroke in self.strokes]
+
+    def to_image(self) -> Image.Image:
+        fig, ax = self._create_plot()
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+        buf.seek(0)
+        img = Image.open(buf)
+        plt.close(fig)
+        
+        return img
 
     def to_origin(self) -> 'DigitalInk':
         start = self.strokes[0].points[0]
@@ -153,6 +202,12 @@ class DigitalInk[T: (float, int)](BaseModel):
     
     def scale(self, scale: float) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.scale(scale) for stroke in self.strokes])
+
+    def scale_x(self, scale: float) -> 'DigitalInk':
+        return DigitalInk(strokes=[stroke.scale_x(scale) for stroke in self.strokes])
+    
+    def scale_y(self, scale: float) -> 'DigitalInk':
+        return DigitalInk(strokes=[stroke.scale_y(scale) for stroke in self.strokes])
     
     def discretise(self) -> 'DigitalInk[int]':
         return DigitalInk(strokes=[stroke.discretise() for stroke in self.strokes])
@@ -162,9 +217,27 @@ class DigitalInk[T: (float, int)](BaseModel):
 
     def smooth(self, window_length: int, polyorder: int) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.smooth(window_length, polyorder) for stroke in self.strokes])
+
+    def flip_y(self) -> 'DigitalInk':
+        return DigitalInk(strokes=[stroke.flip_y() for stroke in self.strokes])
+    
+    def dedup(self) -> 'DigitalInk':
+        return DigitalInk(strokes=[stroke.dedup() for stroke in self.strokes])
     
     def visualise(self, connect: bool=True, name: str | None = None) -> None:
-        fig, ax = plt.subplots(figsize=(12, 8))
+        fig, ax = self._create_plot(connect=connect)
+
+        count = len(list(TMP_DIR.iterdir()))
+        name = str(count) if name is None else f"{count}_{name}"
+        name = name[:100]
+        
+        pdf_path = TMP_DIR / f'{name}.pdf'
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(pdf_path, format='pdf', bbox_inches='tight')
+        plt.close(fig)
+
+    def _create_plot(self, connect: bool = True, figsize: tuple[int, int] = (12, 8)) -> tuple[Figure, Axes]:
+        fig, ax = plt.subplots(figsize=figsize)
         ax.set_aspect('equal', adjustable='box')
         ax.invert_yaxis()
 
@@ -178,15 +251,8 @@ class DigitalInk[T: (float, int)](BaseModel):
                 ax.plot(x, y, '-k', linewidth=1.5)
             else:
                 ax.scatter(x, y, s=0.5, c='k')
-
-        count = len(list(TMP_DIR.iterdir()))
-        name = str(count) if name is None else f"{count}_{name}"
-        name = name[:100]
         
-        pdf_path = TMP_DIR / f'{name}.pdf'
-        pdf_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(pdf_path, format='pdf', bbox_inches='tight')
-        plt.close()
+        return fig, ax
     
     
 if __name__ == "__main__":

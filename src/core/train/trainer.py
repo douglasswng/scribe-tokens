@@ -161,12 +161,15 @@ class Trainer:
     def __init__(self,
                  model_paths: ModelPaths,
                  tracker: Tracker,
-                 max_grad_norm: float=1.0):
+                 patience: int,
+                 max_grad_norm: float=1.0,
+                 monitor_every_n_epochs: int=1):
         self._tracker = tracker
         self._max_grad_norm = max_grad_norm
+        self._monitor_every_n_epochs = monitor_every_n_epochs
 
         self._checkpointer = Checkpointer(model_paths)
-        self._early_stopper = EarlyStopper()  
+        self._early_stopper = EarlyStopper(patience=patience)  
 
     def _run_training_epoch(self, train_state: TrainState, train_stats: TrainStats,
                             train_loader: DataLoader, num_epochs: int) -> None:
@@ -191,12 +194,12 @@ class Trainer:
         with torch.no_grad():
             # Randomly select a batch for monitoring (only on master process)
             monitor_batch_idx = None
-            if distributed_context.is_master and len(val_pbar) > 0:
+            if distributed_context.is_master and len(val_pbar) > 0 and train_state.epoch % self._monitor_every_n_epochs == 0:
                 monitor_batch_idx = random.randint(0, len(val_pbar) - 1)
             
             for batch_idx, batch in enumerate(val_pbar):
                 if batch_idx == monitor_batch_idx:
-                    train_state.model.monitor(batch)
+                    train_state.model.monitor(batch, self._tracker)
 
                 process_validation_batch(train_state, train_stats, batch)
                 if distributed_context.is_master:

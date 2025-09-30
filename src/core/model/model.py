@@ -6,6 +6,7 @@ import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from core.data_schema.batch import Batch
+from core.model.tracker import Tracker
 from core.utils.distributed_context import distributed_context
 from core.constants import HIDDEN_DIM, VOCAB_SIZE
 
@@ -23,7 +24,7 @@ class ModelMixin(ABC):
     def losses(self, batch: Batch) -> dict[str, torch.Tensor]: ...
     
     @abstractmethod
-    def monitor(self, batch: Batch) -> None: ...
+    def monitor(self, batch: Batch, tracker: Tracker | None) -> None: ...
 
     def forward(self, batch: Batch) -> dict[str, torch.Tensor]:
         return self.losses(batch)
@@ -78,8 +79,8 @@ class DistributedModel(DDP):
     def num_embedding_params(self) -> int:
         return self.local_model.num_embedding_params
     
-    def monitor(self, batch: Batch) -> None:
-        return self.local_model.monitor(batch)
+    def monitor(self, batch: Batch, tracker: Tracker | None) -> None:
+        return self.local_model.monitor(batch, tracker)
     
     
 type Model = LocalModel | DistributedModel

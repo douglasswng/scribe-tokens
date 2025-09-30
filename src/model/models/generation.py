@@ -3,7 +3,7 @@ from functools import partial
 import torch
 from torch import Tensor
 
-from core.model import LocalModel, ModelId
+from core.model import LocalModel, ModelId, Tracker
 from core.data_schema import Batch, DigitalInk, Instance, PairBatch
 from repr.factory import DefaultReprFactory
 from model.modules.embedder import Embedder, CharEmbedder, MDNOutput
@@ -146,11 +146,17 @@ class GenerationModel(LocalModel, LossMixin):
             inks = [self._ink_callable(tensor=gen_tensor) for gen_tensor in gen_tensors]
             return inks
     
-    def monitor(self, batch: Batch) -> None:
+    def monitor(self, batch: Batch, tracker: Tracker | None=None) -> None:
         assert isinstance(batch, PairBatch)
         main_instance, ref_instance = batch.get_random_instance_pair()
         gen_ink = self.generate_inks(main_instance=main_instance, ref_instance=ref_instance)[0]
-        gen_ink.visualise(name=f"{self._model_id}: {main_instance.parsed.text}")
+        main_text = main_instance.parsed.text
+        self._monitor_ink(gen_ink, "Generated", main_text, tracker)
+
+    def _monitor_ink(self, ink: DigitalInk, task: str, caption: str, tracker: Tracker | None=None) -> None:
+        ink.visualise(name=f"{task}: {caption}")
+        if tracker is not None:
+            tracker.log_image(ink.to_image(), task, caption)
 
         
 if __name__ == "__main__":

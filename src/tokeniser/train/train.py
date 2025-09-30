@@ -18,12 +18,15 @@ def get_id_iterator() -> Iterator[TokenReprId]:
 def get_ink_iterator(data_split: DataSplit) -> Iterator[DigitalInk]:
     for path in data_split.train_paths:
         parsed = Parsed.from_path(path)
-        yield parsed.ink
+        yield parsed.ink.to_origin()
 
 
 def train_tokenisers() -> None:
     data_split = create_datasplit()
     for id in get_id_iterator():
+        if id.tokeniser_path.exists():
+            print(f"Tokeniser {id} already exists, skipping...")
+            continue
         trainer = InkBpeTrainer(id, MAX_VOCAB_SIZE)
         ink_iterator = get_ink_iterator(data_split)
         try:

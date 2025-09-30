@@ -2,6 +2,8 @@ from typing import Protocol, Self
 from pathlib import Path
 from enum import Enum
 
+import ujson as json
+
 from core.utils import distributed_context
 from core.constants import TOKENISERS_DIR, VOCAB_SIZE, DELTA
 
@@ -145,3 +147,34 @@ class TokenReprId(ReprId):
     @property
     def has_oov(self) -> bool:
         return self.type in {TokenReprType.REL, TokenReprType.ABS}
+    
+    @property
+    def has_trained(self) -> bool:
+        # Check if tokenizer directory exists
+        if not self.tokeniser_path.exists():
+            return False
+        
+        # If no vocab_size is specified, we can't verify the tokenizer is trained for it
+        if self.vocab_size is None:
+            return False
+        
+        with open(self.vocab_path, 'r') as f:
+            vocab_data = json.load(f)
+        actual_vocab_size = len(vocab_data)
+        
+        # Vocab must be large enough
+        if actual_vocab_size < self.vocab_size:
+            return False
+        
+        # Count the number of merges
+        with open(self.merges_path, 'r') as f:
+            num_merges = sum(1 for line in f if line.strip())
+        
+        # Calculate how many merges would remain after pruning
+        # reduce_count = actual_vocab_size - vocab_size
+        # pruned_merges = merges[:-reduce_count] if reduce_count > 0 else merges
+        reduce_count = actual_vocab_size - self.vocab_size
+        remaining_merges = num_merges - reduce_count if reduce_count > 0 else num_merges
+        
+        # We need at least one merge for the trained tokenizer to be useful
+        return remaining_merges > 0

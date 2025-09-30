@@ -12,10 +12,10 @@ def get_unicode_iterator() -> Iterator[str]:
 
 
 class LazyBiDict[T]:
-    def __init__(self, value_iterator: Iterator[str]=get_unicode_iterator()):
+    def __init__(self, value_iterator: Iterator[str] | None = None):
         self.forward: dict[T, str] = {}
         self.backward: dict[str, T] = {}
-        self.value_iterator = value_iterator
+        self.value_iterator = value_iterator if value_iterator is not None else get_unicode_iterator()
 
     def __getitem__(self, key: T) -> str:
         if key not in self.forward:

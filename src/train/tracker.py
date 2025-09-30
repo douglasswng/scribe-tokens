@@ -1,4 +1,4 @@
-from core.train.tracker import MLFlowTracker, SwanLabTracker, Tracker
+from core.model.tracker import MLFlowTracker, SwanLabTracker, Tracker
 from core.model import ModelId
 from core.utils import distributed_context
 from core.constants import TRACKERS_DIR, BATCH_SIZE, LEARNING_RATE, WEIGHT_DECAY, NUM_EPOCHS, PATIENCE, DELTA, HIDDEN_DIM, NUM_HEADS, DROPOUT, VOCAB_SIZE, FFN_FACTOR, NUM_LAYERS
@@ -11,7 +11,7 @@ class DefaultTracker(Tracker):
         if distributed_context.is_worker:
             return
         
-        self.begin_experiment(name='ScribeTokens0728',
+        self.begin_experiment(name='ScribeTokens0930',
                               artifact_dir=TRACKERS_DIR / tracker_name)
         self.begin_run(tags=[model_id.task.value, str(model_id.repr_id)],
                        run_name=str(model_id))

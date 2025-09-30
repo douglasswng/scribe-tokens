@@ -1,8 +1,13 @@
 from typing import Protocol
 from pathlib import Path
 
+import numpy as np
+from PIL import Image
 import mlflow
 import swanlab
+
+
+type ImageType = np.ndarray | Image.Image
 
 
 class Tracker(Protocol):
@@ -10,6 +15,7 @@ class Tracker(Protocol):
     def begin_run(self, tags: list[str], run_name: str) -> None: ...
     def log_params(self, params: dict[str, float]) -> None: ...
     def log_metrics(self, metrics: dict[str, float]) -> None: ...
+    def log_image(self, image: ImageType, name: str, caption: str | None = None) -> None: ...
     def is_active(self) -> bool: ...
     def end_run(self) -> None: ...
 
@@ -40,6 +46,9 @@ class MLFlowTracker(Tracker):
             current_step = self.step_counters.get(metric_name, 0)
             mlflow.log_metric(metric_name, value, step=current_step)
             self.step_counters[metric_name] = current_step + 1
+
+    def log_image(self, image: ImageType, name: str, caption: str | None = None) -> None:
+        mlflow.log_image(image, f"{name}: {caption or ''}")
 
     def end_run(self) -> None:
         mlflow.end_run()
@@ -78,6 +87,9 @@ class SwanLabTracker(Tracker):
 
     def log_metrics(self, metrics: dict[str, float]) -> None:
         swanlab.log(metrics)
+
+    def log_image(self, image: ImageType, name: str, caption: str | None = None) -> None:
+        swanlab.log({name: swanlab.Image(image, caption=caption or name)})
 
     def end_run(self) -> None:
         swanlab.finish()

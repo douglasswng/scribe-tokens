@@ -12,7 +12,7 @@ from core.train.stats import TrainStats, BatchStats
 from core.train.state import TrainState
 from core.train.checkpointer import Checkpointer
 from core.train.early_stopper import EarlyStopper
-from core.train.tracker import Tracker
+from core.model.tracker import Tracker
 from core.model.paths import ModelPaths
 from core.data_schema.batch import Batch
 from core.utils.distributed_context import distributed_context

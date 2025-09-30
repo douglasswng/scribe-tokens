@@ -34,7 +34,7 @@ NUM_CHARS = len(CHARS)  # 79
 VOCAB_SIZE = 32000
 DELTA = 8
 MAX_LEN = int(1e4)
-SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
+SCRIBE_DOWNSAMPLE_FACTOR = 16 / DELTA # for scribe's post processor
 
 # Model hyperparameters
 HIDDEN_DIM = 384

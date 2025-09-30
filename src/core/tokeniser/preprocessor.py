@@ -21,7 +21,7 @@ class DeltaPreprocessor(Preprocessor):
 
 class DeltaSmoothPreprocessor(DeltaPreprocessor):
     def __init__(self, delta: int | float,
-                 downsample_factor: int=1,
+                 downsample_factor: float=1,
                  smooth_window_length: int=7,
                  smooth_polyorder: int=3):
         super().__init__(delta)

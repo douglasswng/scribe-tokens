@@ -66,14 +66,16 @@ class Stroke[T: (float, int)](BaseModel):
     def discretise(self) -> 'Stroke[int]':
         return Stroke(points=[point.round() for point in self.points])
 
-    def downsample(self, factor: int) -> 'Stroke':
+    def downsample(self, factor: float) -> 'Stroke':
         if len(self.points) <= 2:
             return Stroke(points=self.points[:])
         
         downsampled = [self.points[0]]
         
-        for i in range(factor, len(self.points) - 1, factor):
-            downsampled.append(self.points[i])
+        i = factor
+        while i < len(self.points) - 1:
+            downsampled.append(self.points[int(i)])
+            i += factor
         
         downsampled.append(self.points[-1])
         
@@ -155,7 +157,7 @@ class DigitalInk[T: (float, int)](BaseModel):
     def discretise(self) -> 'DigitalInk[int]':
         return DigitalInk(strokes=[stroke.discretise() for stroke in self.strokes])
 
-    def downsample(self, factor: int) -> 'DigitalInk':
+    def downsample(self, factor: float) -> 'DigitalInk':
         return DigitalInk(strokes=[stroke.downsample(factor) for stroke in self.strokes])
 
     def smooth(self, window_length: int, polyorder: int) -> 'DigitalInk':
@@ -169,7 +171,10 @@ class DigitalInk[T: (float, int)](BaseModel):
         for stroke in self.strokes:
             x = [point.x for point in stroke.points]
             y = [point.y for point in stroke.points]
-            if connect:
+            
+            if len(stroke.points) == 1:
+                ax.scatter(x, y, s=10, c='k')
+            elif connect:
                 ax.plot(x, y, '-k', linewidth=1.5)
             else:
                 ax.scatter(x, y, s=0.5, c='k')

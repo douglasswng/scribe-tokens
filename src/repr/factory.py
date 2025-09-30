@@ -61,4 +61,7 @@ if __name__ == "__main__":
         ink1 = DefaultReprFactory.repr_to_ink(repr_id, repr)
         ink2 = DefaultReprFactory.tensor_to_ink(repr_id, tensor1)
 
+        print(ink1)
         ink1.visualise()
+        
+        raise

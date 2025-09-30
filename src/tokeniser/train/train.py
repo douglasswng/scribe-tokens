@@ -10,7 +10,6 @@ MAX_VOCAB_SIZE = 100_000
 
 
 def get_id_iterator() -> Iterator[TokenReprId]:
-    yield TokenReprId(delta=1, type=TokenReprType.REL)
     for delta in reversed(DELTAS):  # larger deltas train quicker
         for type in TokenReprType:
             yield TokenReprId(delta=delta, type=type)
@@ -19,7 +18,7 @@ def get_id_iterator() -> Iterator[TokenReprId]:
 def get_ink_iterator(data_split: DataSplit) -> Iterator[DigitalInk]:
     for path in data_split.train_paths:
         parsed = Parsed.from_path(path)
-        yield parsed.ink
+        yield parsed.ink.to_origin()
 
 
 def train_tokenisers() -> None:

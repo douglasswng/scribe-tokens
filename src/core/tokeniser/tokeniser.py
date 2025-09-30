@@ -19,16 +19,6 @@ class Tokeniser:
         if self._trained_tokeniser is None:
             raise ValueError("Trained tokeniser is not set")
         return self._trained_tokeniser.unk_token_id
-    
-    @property
-    def has_trained(self) -> bool:
-        if self._trained_tokeniser is None:
-            return False
-        
-        if self._trained_tokeniser.has_merges:
-            return True
-        
-        return False
 
     def tokenise(self, digital_ink: DigitalInk) -> list[Token]:
         tokens = self._preprocessor.preprocess(digital_ink)

@@ -11,8 +11,6 @@ class TrainedTokeniser:
                  merges: list[tuple[RegularToken, RegularToken]]):
         self._vocab = vocab
         self._merger = self._init_merger(vocab, merges)
-        
-        self.has_merges = bool(merges)
     
     @cached_property
     def _reverse_vocab(self) -> dict[int, Token]:

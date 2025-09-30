@@ -7,7 +7,6 @@ __pycache__
 *.ipynb
 .env
 del*
-*.pdf
 /data_demo/
 /artifacts_demo/
 

@@ -81,7 +81,15 @@ def create_compression_plot(df: pd.DataFrame, figsize: tuple[int, int] = (12, 8)
     fig, axes = _setup_subplot_grid(n_tokenizers, figsize)
     colors = plt.colormaps['viridis'](np.linspace(0, 1.0, 6))
     
-    for i, tokenizer_type in enumerate(tokenizer_types):
+    # Separate "ours" from other tokenizers
+    tokenizer_types_list = list(tokenizer_types)
+    ours_tokenizers = [t for t in tokenizer_types_list if t == OURS]
+    other_tokenizers = [t for t in tokenizer_types_list if t != OURS]
+    
+    # Plot other tokenizers first, then ours at the end (bottom right)
+    reordered_tokenizers = other_tokenizers + ours_tokenizers
+    
+    for i, tokenizer_type in enumerate(reordered_tokenizers):
         tokenizer_data: pd.DataFrame = df[df['tokeniser_type'] == tokenizer_type]  # type: ignore[assignment]
         _plot_tokenizer_data(axes[i], tokenizer_data, tokenizer_type, list(colors))
     

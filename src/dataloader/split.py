@@ -1,41 +1,45 @@
 from pathlib import Path
-import random
 from dataclasses import dataclass
 from functools import lru_cache
 
-from core.utils import set_random_seed
-from core.constants import PARSED_DIR, BLACKLIST_PATH
+from core.constants import PARSED_DIR, SPLIT_DIR
 
 
-def split_paths(paths: list[Path], train_ratio: float, val_ratio: float
-                ) -> tuple[list[Path], list[Path], list[Path]]:
-    shuffled_paths = paths.copy()
-    random.shuffle(shuffled_paths)
-
-    train_count = int(len(shuffled_paths) * train_ratio)
-    val_count = int(len(shuffled_paths) * val_ratio)
-
-    train_paths = shuffled_paths[:train_count]
-    val_paths = shuffled_paths[train_count:train_count + val_count]
-    test_paths = shuffled_paths[train_count + val_count:]
-    return train_paths, val_paths, test_paths
-
-
-def get_blacklist() -> set[str]:
-    with open(BLACKLIST_PATH, 'r') as f:
-        return {line.strip() for line in f.readlines()}
+def load_split_filenames(split_file: Path) -> set[str]:
+    """Load the exact filenames from a split file."""
+    if not split_file.exists():
+        return set()
+    with open(split_file, 'r') as f:
+        # Read and strip whitespace, filter empty lines
+        return {line.strip() for line in f if line.strip()}
 
 
 @lru_cache(maxsize=1)
 def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
-    RANDOM_SEED = 42
-    TRAIN_RATIO = 0.8
-    VAL_RATIO = 0.1
-
-    set_random_seed(RANDOM_SEED)
-    parsed_paths = list(PARSED_DIR.rglob('*.json'))[:]
-    valid_paths = [path for path in parsed_paths if path.stem not in get_blacklist()]
-    return split_paths(valid_paths, TRAIN_RATIO, VAL_RATIO)
+    """Split parsed paths based on predefined split files with exact filename matching."""
+    # Find the dataset directory (assumes there's one subdirectory in parsed/)
+    dataset_dirs = [d for d in PARSED_DIR.iterdir() if d.is_dir()]
+    if not dataset_dirs:
+        raise ValueError(f"No dataset directory found in {PARSED_DIR}")
+    
+    dataset_dir = dataset_dirs[0]  # Use the first dataset directory
+    dataset_name = dataset_dir.name
+    split_dataset_dir = SPLIT_DIR / dataset_name
+    
+    # Load exact filenames from split files
+    train_filenames = load_split_filenames(split_dataset_dir / 'train.txt')
+    test_filenames = load_split_filenames(split_dataset_dir / 'test.txt')
+    
+    # Combine val1 and val2
+    val_filenames = load_split_filenames(split_dataset_dir / 'val1.txt')
+    val_filenames.update(load_split_filenames(split_dataset_dir / 'val2.txt'))
+    
+    # Build paths using exact filename matching
+    train_paths = sorted([dataset_dir / fname for fname in train_filenames if (dataset_dir / fname).exists()])
+    val_paths = sorted([dataset_dir / fname for fname in val_filenames if (dataset_dir / fname).exists()])
+    test_paths = sorted([dataset_dir / fname for fname in test_filenames if (dataset_dir / fname).exists()])
+    
+    return train_paths, val_paths, test_paths
 
 
 @dataclass(frozen=True)

@@ -78,7 +78,7 @@ class ScribeTokeniser(DiscreteTokeniser):
     def detokenise(self, tokens: list[Token]) -> DigitalInk[int]:
         current_point: Point[int] = Point(x=0, y=0)
         strokes: list[Stroke[int]] = [Stroke(points=[current_point])]
-        pen_state: Literal['up', 'down'] = 'up'
+        pen_state: Literal['up', 'down'] = 'down'
         for token in tokens:
             match token, pen_state:
                 case self.start_token, _:

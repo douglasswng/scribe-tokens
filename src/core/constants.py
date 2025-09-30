@@ -10,10 +10,12 @@ ARTIFACTS_DIR = BASE_DIR / "artifacts"
 
 RAW_DIR = DATA_DIR / "raw"
 PARSED_DIR = DATA_DIR / "parsed"
-BLACKLIST_PATH = PARSED_DIR / "blacklist.txt"  # some bad datapoints
+SPLIT_DIR = DATA_DIR / "split"
 
 RAW_IAM_DIR = RAW_DIR / "iam"
+RAW_IAM_SPLIT_DIR = RAW_IAM_DIR / "split"
 PARSED_IAM_DIR = PARSED_DIR / "iam"
+SPLIT_IAM_DIR = SPLIT_DIR / "iam"
 
 TOKENISERS_DIR = ARTIFACTS_DIR / "tokenisers"
 CHECKPOINTS_DIR = ARTIFACTS_DIR / "checkpoints"
@@ -32,7 +34,7 @@ NUM_CHARS = len(CHARS)  # 79
 VOCAB_SIZE = 32000
 DELTA = 8
 MAX_LEN = int(1e4)
-SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
+SCRIBE_DOWNSAMPLE_FACTOR = 16 / DELTA # for scribe's post processor
 
 # Model hyperparameters
 HIDDEN_DIM = 384

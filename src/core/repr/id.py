@@ -115,6 +115,14 @@ class TokenReprId(ReprId):
         return TOKENISERS_DIR / self.type.value / f'{self.type.value}-{self._delta}'
     
     @property
+    def vocab_path(self) -> Path:
+        return self.tokeniser_path / 'vocab.json'
+    
+    @property
+    def merges_path(self) -> Path:
+        return self.tokeniser_path / 'merges.txt'
+    
+    @property
     def type(self) -> TokenReprType:
         return self._type
     

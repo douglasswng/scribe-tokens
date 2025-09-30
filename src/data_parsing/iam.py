@@ -7,7 +7,7 @@ import ujson as json
 
 from core.data_schema import Parsed, DigitalInk
 from core.utils import clear_folder
-from core.constants import RAW_IAM_DIR, PARSED_IAM_DIR
+from core.constants import RAW_IAM_DIR, RAW_IAM_SPLIT_DIR, PARSED_IAM_DIR, SPLIT_IAM_DIR
 
 
 @lru_cache(maxsize=None)
@@ -66,6 +66,39 @@ def save_parsed(parsed: Parsed) -> None:
         json.dump(parsed.model_dump(), f, indent=4)
 
 
+def parse_split_files() -> None:
+    """Parse raw split files and convert them to standardized format with exact filenames."""
+    SPLIT_IAM_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Get all parsed file IDs
+    all_parsed_ids = {path.stem for path in PARSED_IAM_DIR.glob('*.json')}
+    
+    # Process each split file
+    for split_file in RAW_IAM_SPLIT_DIR.glob('*.txt'):
+        # Read prefixes from raw split file
+        with open(split_file, 'r') as f:
+            prefixes = {line.strip() for line in f if line.strip()}
+        
+        # Find all matching parsed file IDs
+        matching_ids = []
+        for parsed_id in all_parsed_ids:
+            # Check if any prefix matches this parsed_id
+            for prefix in prefixes:
+                # Remove trailing 'x' from prefix if present
+                clean_prefix = prefix.rstrip('x')
+                if parsed_id.startswith(clean_prefix):
+                    matching_ids.append(parsed_id)
+                    break
+        
+        # Write standardized split file with exact filenames
+        output_file = SPLIT_IAM_DIR / split_file.name
+        with open(output_file, 'w') as f:
+            for file_id in sorted(matching_ids):
+                f.write(f'{file_id}.json\n')
+        
+        print(f"Generated {output_file.name} with {len(matching_ids)} files")
+
+
 def main() -> None:
     original_dir = RAW_IAM_DIR / 'original'
     for path in sorted(original_dir.rglob('*.xml')):
@@ -73,6 +106,10 @@ def main() -> None:
         parsed_elements = parse_element(element)
         for parsed in parsed_elements:
             save_parsed(parsed)
+    
+    # After parsing data, generate standardized split files
+    print("\nGenerating standardized split files...")
+    parse_split_files()
 
 
 if __name__ == "__main__":

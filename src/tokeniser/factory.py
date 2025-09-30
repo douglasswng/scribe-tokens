@@ -82,10 +82,10 @@ class TrainedFactory:
                 print(f"Warning: {id} has no vocab size")
             return None
 
-        vocab_path = id.tokeniser_path / 'vocab.json'
+        vocab_path = id.vocab_path
         vocab = cls._load_vocab(vocab_path)
 
-        merges_path = id.tokeniser_path / 'merges.txt'
+        merges_path = id.merges_path
         merges = cls._load_merges(merges_path)
 
         vocab, merges = cls._prune_vocab_and_merges(vocab, merges, id.vocab_size)

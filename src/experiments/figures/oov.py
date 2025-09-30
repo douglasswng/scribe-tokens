@@ -1,4 +1,3 @@
-from ...constants import RESULTS_DIR, FIGURES_DIR
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -6,11 +5,16 @@ from matplotlib.axes import Axes
 import numpy as np
 from pathlib import Path
 
+from core.constants import RESULTS_DIR, FIGURES_DIR
+
+
 RESULT_PATH = RESULTS_DIR / 'oov.csv'
 FIGURE_PATH = FIGURES_DIR / 'oov.pdf'
 
+
 def load_data(file_path: Path = RESULT_PATH) -> pd.DataFrame:
     return pd.read_csv(file_path)
+
 
 def _setup_subplot_grid(n_tokenizers: int, figsize: tuple[int, int]) -> tuple[Figure, list]:
     """Set up the subplot grid based on number of tokenizers."""
@@ -18,21 +22,22 @@ def _setup_subplot_grid(n_tokenizers: int, figsize: tuple[int, int]) -> tuple[Fi
     rows = (n_tokenizers + 1) // 2
     fig, axes = plt.subplots(rows, cols, figsize=figsize, sharex=True, sharey=True)
     
-    if n_tokenizers == 1:
-        axes = [axes]
-    elif rows == 1:
-        axes = axes
+    # Always convert to a flat list for consistent indexing
+    if isinstance(axes, np.ndarray):
+        axes = axes.flatten().tolist()
     else:
-        axes = axes.flatten()
+        # Single subplot case
+        axes = [axes]
     
     return fig, axes
+
 
 def _plot_tokenizer_data(ax: Axes, tokenizer_data: pd.DataFrame, tokenizer_type: str, colors: list, is_ours: bool = False) -> None:
     """Plot data for a single tokenizer type on the given axis."""
     deltas = sorted(tokenizer_data['delta'].unique(), reverse=True)
     
     for j, delta in enumerate(deltas):
-        delta_data = tokenizer_data[tokenizer_data['delta'] == delta].sort_values('vocab_size')
+        delta_data: pd.DataFrame = tokenizer_data[tokenizer_data['delta'] == delta].sort_values('vocab_size')  # type: ignore[call-overload]
         
         ax.plot(
             delta_data['vocab_size'] / 1000,
@@ -52,6 +57,7 @@ def _plot_tokenizer_data(ax: Axes, tokenizer_data: pd.DataFrame, tokenizer_type:
     
     ax.tick_params(axis='both', which='major', labelsize=20)
 
+
 def _finalize_plot_layout(fig: Figure, axes: list, n_tokenizers: int) -> None:
     """Hide unused subplots and add axis labels."""
     # Hide unused subplots
@@ -65,6 +71,7 @@ def _finalize_plot_layout(fig: Figure, axes: list, n_tokenizers: int) -> None:
     # Use subplots_adjust instead of tight_layout for better control
     plt.subplots_adjust(left=0.08, bottom=0.08, right=0.95, top=0.92, wspace=0.2, hspace=0.2)
 
+
 def create_oov_plot(df: pd.DataFrame, figsize: tuple[int, int] = (12, 8)) -> Figure:
     tokenizer_types = df['tokeniser_type'].unique()
     n_tokenizers = len(tokenizer_types)
@@ -73,16 +80,18 @@ def create_oov_plot(df: pd.DataFrame, figsize: tuple[int, int] = (12, 8)) -> Fig
     colors = plt.colormaps['viridis'](np.linspace(0, 0.7, 5))
     
     for i, tokenizer_type in enumerate(tokenizer_types):
-        tokenizer_data = df[df['tokeniser_type'] == tokenizer_type]
+        tokenizer_data: pd.DataFrame = df[df['tokeniser_type'] == tokenizer_type]  # type: ignore[assignment]
         is_ours = (i == len(tokenizer_types) - 1)  # Last tokenizer is ours
         _plot_tokenizer_data(axes[i], tokenizer_data, tokenizer_type, list(colors), is_ours)
     
     _finalize_plot_layout(fig, axes, n_tokenizers)
     return fig
 
+
 def save_figure(fig: Figure, output_path: Path = FIGURE_PATH) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight', dpi=300)
+
 
 def plot(input_path: Path = RESULT_PATH, output_path: Path = FIGURE_PATH, 
          figsize: tuple[int, int] = (12, 4), show: bool = True) -> None:
@@ -92,6 +101,7 @@ def plot(input_path: Path = RESULT_PATH, output_path: Path = FIGURE_PATH,
     
     if show:
         plt.show()
+
 
 if __name__ == "__main__":
     plot()

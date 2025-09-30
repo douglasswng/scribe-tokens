@@ -12,3 +12,5 @@ del*
 /artifacts_demo/
 
 !/artifacts/tokenisers/
+!/artifacts/results/
+!/artifacts/figures/

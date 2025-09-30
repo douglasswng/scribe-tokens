@@ -2,17 +2,25 @@ from pathlib import Path
 from typing import Iterator
 from itertools import product
 import csv
-from ..tokeniser import TokeniserFactory
-from ..data import DataSplit
-from ..schemas import TokenReprId, TokenReprType, TokeniserFramework, DigitalInk
+from core.tokeniser import Tokeniser
+from tokeniser.factory import DefaultTokeniserFactory
+from dataloader.split import DataSplit, create_datasplit
+from core.repr.id import TokenReprId, TokenReprType
+from core.data_schema import DigitalInk, Parsed
 
 PERSISTENT_COLUMNS = ('tokeniser_type', 'delta', 'vocab_size')
 
-def get_ink_iterator(data_split: DataSplit = DataSplit()) -> Iterator[DigitalInk]:
-    for iam in data_split.val_iams:
-        yield DigitalInk.from_iam(iam)
+
+def get_ink_iterator(data_split: DataSplit = create_datasplit()) -> Iterator[DigitalInk]:
+    for path in data_split.val_paths[:]:
+        parsed = Parsed.from_path(path)
+        yield parsed.ink
+
 
 def seen_tokeniser(result_path: Path, tokeniser_id: TokenReprId, vocab_size: int) -> bool:
+    if not result_path.exists():
+        return False
+
     with open(result_path, 'r') as f:
         reader = csv.reader(f)
         next(reader, None)  # Skip header
@@ -23,21 +31,23 @@ def seen_tokeniser(result_path: Path, tokeniser_id: TokenReprId, vocab_size: int
                  return True
     return False
 
+
 def get_tokeniser_iterator(result_path: Path,
                            types: list[TokenReprType],
                            deltas: list[int],
-                           vocab_sizes: list[int]) -> Iterator[TokeniserFramework]:
+                           vocab_sizes: list[int]) -> Iterator[tuple[TokenReprId, Tokeniser]]:
     for type, delta, vocab_size in product(types, deltas, vocab_sizes):
-        tokeniser_id = TokenReprId(delta=delta, type=type)
+        tokeniser_id = TokenReprId(delta=delta, type=type, vocab_size=vocab_size)
         if seen_tokeniser(result_path, tokeniser_id, vocab_size):
             print(f"Skipping {tokeniser_id!s} (vocab={vocab_size}) because it has already been seen")
             continue
-        tokeniser = TokeniserFactory.create_tokeniser(tokeniser_id, vocab_size=vocab_size)
-        yield tokeniser
+        tokeniser = DefaultTokeniserFactory.create(tokeniser_id)
+        yield tokeniser_id, tokeniser
+
 
 def add_results(result_path: Path,
                 result_name: str,  # e.g. 'compression rate'
-                tokeniser: TokeniserFramework,
+                tokeniser_id: TokenReprId,
                 result: float,
                 persistent_columns: tuple[str, ...]=PERSISTENT_COLUMNS) -> None:
     columns = list(persistent_columns) + [result_name]
@@ -47,12 +57,13 @@ def add_results(result_path: Path,
             writer = csv.writer(f)
             writer.writerow(columns)
 
-    tokeniser_type = tokeniser.tokeniser_id.type.value
-    delta = tokeniser.tokeniser_id.delta
-    vocab_size = tokeniser.vocab_size
+    tokeniser_type = tokeniser_id.type.value
+    delta = tokeniser_id.delta
+    vocab_size = tokeniser_id.vocab_size
     with open(result_path, 'a') as f:
         writer = csv.writer(f)
         writer.writerow([tokeniser_type, delta, vocab_size, result])
+
 
 def finalise_results(result_path: Path) -> None:
     with open(result_path, 'r') as f:

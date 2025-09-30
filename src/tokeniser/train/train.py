@@ -10,6 +10,7 @@ MAX_VOCAB_SIZE = 100_000
 
 
 def get_id_iterator() -> Iterator[TokenReprId]:
+    yield TokenReprId(delta=1, type=TokenReprType.REL)
     for delta in reversed(DELTAS):  # larger deltas train quicker
         for type in TokenReprType:
             yield TokenReprId(delta=delta, type=type)
@@ -24,6 +25,9 @@ def get_ink_iterator(data_split: DataSplit) -> Iterator[DigitalInk]:
 def train_tokenisers() -> None:
     data_split = create_datasplit()
     for id in get_id_iterator():
+        if id.tokeniser_path.exists():
+            print(f"Tokeniser {id} already exists, skipping...")
+            continue
         trainer = InkBpeTrainer(id, MAX_VOCAB_SIZE)
         ink_iterator = get_ink_iterator(data_split)
         try:

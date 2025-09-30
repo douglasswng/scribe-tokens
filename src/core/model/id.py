@@ -3,6 +3,13 @@ from enum import Enum
 from dataclasses import dataclass
 
 from core.repr import ReprId, TokenReprId, VectorReprId
+from core.constants import (
+    GENERATION_NUM_EPOCHS, GENERATION_LEARNING_RATE,
+    RECOGNITION_NUM_EPOCHS, RECOGNITION_LEARNING_RATE,
+    PRETRAINING_NUM_EPOCHS, PRETRAINING_LEARNING_RATE,
+    RECOGNITION_SFT_NUM_EPOCHS, RECOGNITION_SFT_LEARNING_RATE,
+    GENERATION_SFT_NUM_EPOCHS, GENERATION_SFT_LEARNING_RATE
+)
 
 
 class Task(Enum):
@@ -19,6 +26,38 @@ class Task(Enum):
     @property
     def use_reference(self) -> bool:
         return self in {Task.GENERATION, Task.GENERATION_SFT}
+
+    @property
+    def num_epochs(self) -> int:
+        match self:
+            case Task.GENERATION:
+                return GENERATION_NUM_EPOCHS
+            case Task.RECOGNITION:
+                return RECOGNITION_NUM_EPOCHS
+            case Task.PRETRAINING_NTP:
+                return PRETRAINING_NUM_EPOCHS
+            case Task.RECOGNITION_SFT:
+                return RECOGNITION_SFT_NUM_EPOCHS
+            case Task.GENERATION_SFT:
+                return GENERATION_SFT_NUM_EPOCHS
+            case _:
+                raise ValueError(f"Invalid task: {self}")
+
+    @property
+    def learning_rate(self) -> float:
+        match self:
+            case Task.GENERATION:
+                return GENERATION_LEARNING_RATE
+            case Task.RECOGNITION:
+                return RECOGNITION_LEARNING_RATE
+            case Task.PRETRAINING_NTP:
+                return PRETRAINING_LEARNING_RATE
+            case Task.RECOGNITION_SFT:
+                return RECOGNITION_SFT_LEARNING_RATE
+            case Task.GENERATION_SFT:
+                return GENERATION_SFT_LEARNING_RATE
+            case _:
+                raise ValueError(f"Invalid task: {self}")
 
 
 @dataclass(frozen=True)

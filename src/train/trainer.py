@@ -9,7 +9,7 @@ from model.factory import DefaultModelFactory
 from train.tracker import DefaultMLFlowTracker, DefaultSwanLabTracker
 from core.train import Trainer, TrainState
 from dataloader.create import create_dataloaders
-from core.constants import LEARNING_RATE, WEIGHT_DECAY
+from core.constants import WEIGHT_DECAY, PATIENCE_FACTOR
 
 
 TRACKER: Literal["mlflow", "swanlab"] = "swanlab"
@@ -27,7 +27,9 @@ class DefaultTrainer(Trainer):
     def __init__(self, model_id: ModelId):
         self.model_id = model_id
         self.model_paths = ModelPaths(model_id)
-        super().__init__(self.model_paths, get_tracker_class(TRACKER)(model_id))
+
+        patience = int(PATIENCE_FACTOR * model_id.task.num_epochs)
+        super().__init__(self.model_paths, get_tracker_class(TRACKER)(model_id), patience=patience)
 
     def _initialise_model(self) -> Model:
         model = DefaultModelFactory.create(self.model_id)
@@ -35,7 +37,7 @@ class DefaultTrainer(Trainer):
         return model
     
     def _initialise_optimiser(self, model: Model) -> Optimizer:
-        return AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        return AdamW(model.parameters(), lr=self.model_id.task.learning_rate, weight_decay=WEIGHT_DECAY)
 
     def _initialise_scheduler(self, optimiser: Optimizer) -> LRScheduler:
         main_scheduler = LambdaLR(optimiser, lr_lambda=lambda epoch: 1.0)

@@ -1,9 +1,8 @@
 from core.train.stats import EpochStats
-from core.constants import PATIENCE
 
 
 class EarlyStopper:
-    def __init__(self, patience: int=PATIENCE):
+    def __init__(self, patience: int):
         self._patience = patience
         self._best_epoch = 0
         self._best_loss = float('inf')

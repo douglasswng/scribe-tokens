@@ -49,10 +49,29 @@ NUM_MIXTURES = 20
 # Training hyperparameters
 UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
 BATCH_SIZE = 64
-LEARNING_RATE = 1e-3  # didnt seem to need learning rate warmup or cosine decay
-NUM_EPOCHS = 300
-PATIENCE = int(0.1 * NUM_EPOCHS)  # 10% of the epochs
 WEIGHT_DECAY = 0.01
+PATIENCE_FACTOR = 0.1  # 10% of the epochs
+
+# Task-specific hyperparameters
+# Generation task
+GENERATION_NUM_EPOCHS = 300
+GENERATION_LEARNING_RATE = 1e-3
+
+# Recognition task
+RECOGNITION_NUM_EPOCHS = 100
+RECOGNITION_LEARNING_RATE = 1e-3
+
+# Pretraining task
+PRETRAINING_NUM_EPOCHS = 300
+PRETRAINING_LEARNING_RATE = 1e-3
+
+# Recognition SFT task
+RECOGNITION_SFT_NUM_EPOCHS = 50
+RECOGNITION_SFT_LEARNING_RATE = 1e-4
+
+# Generation SFT task
+GENERATION_SFT_NUM_EPOCHS = 50
+GENERATION_SFT_LEARNING_RATE = 1e-4
 
 # Augmenter hyperparameters
 SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)

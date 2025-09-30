@@ -1,6 +1,5 @@
 from core.model import ModelId, ModelPaths
 from train.trainer import DefaultTrainer
-from core.constants import NUM_EPOCHS
 
 
 def is_trained(model_id: ModelId) -> bool:
@@ -16,7 +15,7 @@ def main() -> None:
             continue
         
         trainer = DefaultTrainer(model_id)
-        trainer.train_with_resume(NUM_EPOCHS)
+        trainer.train_with_resume(model_id.task.num_epochs)
 
 
 if __name__ == "__main__":

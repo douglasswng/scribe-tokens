@@ -1,7 +1,8 @@
-from core.model import ModelId
+from core.model import ModelId, Tracker
 from model.modules.embedder import Embedder
 from model.modules.decoder import TransformerDecoder
 from model.models.generation import GenerationModel
+from core.data_schema import Batch, SingletonBatch
 
 
 class PretrainingModel(GenerationModel):
@@ -15,6 +16,13 @@ class PretrainingModel(GenerationModel):
     @property
     def repr_embedder(self) -> Embedder:
         return self._repr_embedder
+    
+    def monitor(self, batch: Batch, tracker: Tracker | None=None) -> None:
+        assert isinstance(batch, SingletonBatch)
+        main_instance = batch.get_random_instance()
+        gen_ink = self.generate_inks(main_instance=main_instance)[0]
+        main_text = main_instance.parsed.text
+        self._monitor_ink(gen_ink, "Generated", main_text, tracker)
 
         
 if __name__ == "__main__":

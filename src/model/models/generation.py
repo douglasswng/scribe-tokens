@@ -5,6 +5,7 @@ from torch import Tensor
 
 from core.model import LocalModel, ModelId, Tracker
 from core.data_schema import Batch, DigitalInk, Instance, PairBatch
+from core.constants import HIDDEN_DIM
 from repr.factory import DefaultReprFactory
 from model.modules.embedder import Embedder, CharEmbedder, MDNOutput
 from model.modules.decoder import TransformerDecoder
@@ -112,7 +113,7 @@ class GenerationModel(LocalModel, LossMixin):
         return bool(has_eos.all())
         
     def generate_inks(self, main_instance: Instance,
-                      ref_instance: Instance,
+                      ref_instance: Instance | None = None,
                       num_gen: int = 1,
                       temperature: float = 1.0,
                       max_len: int = 500) -> list[DigitalInk]:
@@ -120,11 +121,15 @@ class GenerationModel(LocalModel, LossMixin):
             raise ValueError("Generation is not supported in training mode")
         
         with torch.no_grad():
-            ref_repr_embedded = self._repr_embedder.embed(ref_instance.repr)
-            ref_char_embedded = self._char_embedder.embed(ref_instance.char)
-            main_char_embedded = self._char_embedder.embed(main_instance.char)
-            static_input = torch.cat([ref_repr_embedded, ref_char_embedded, main_char_embedded], dim=0)
-            static_input = static_input.unsqueeze(0).expand(num_gen, -1, -1)
+            if ref_instance is not None:  # conditional generation
+                ref_repr_embedded = self._repr_embedder.embed(ref_instance.repr)
+                ref_char_embedded = self._char_embedder.embed(ref_instance.char)
+                main_char_embedded = self._char_embedder.embed(main_instance.char)
+                static_input = torch.cat([ref_repr_embedded, ref_char_embedded, main_char_embedded], dim=0)
+                static_input = static_input.unsqueeze(0).expand(num_gen, -1, -1)
+            else:  # unconditional generation
+                device = main_instance.repr.device
+                static_input = torch.empty(num_gen, 0, HIDDEN_DIM).to(device)
 
             if self._model_id.repr_id.is_token:
                 gen_tensors = main_instance.repr_bos.unsqueeze(0).expand(num_gen, -1)

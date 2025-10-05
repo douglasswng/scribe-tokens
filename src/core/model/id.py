@@ -14,6 +14,7 @@ from core.constants import (
 
 class Task(Enum):
     GENERATION = 'generation'
+    ENHANCEMENT = 'enhancement'
     RECOGNITION = 'recognition'
     PRETRAINING_NTP = 'pretraining_ntp'
     RECOGNITION_SFT = 'recognition_sft'
@@ -32,6 +33,8 @@ class Task(Enum):
         match self:
             case Task.GENERATION:
                 return GENERATION_NUM_EPOCHS
+            case Task.ENHANCEMENT:
+                return GENERATION_NUM_EPOCHS  # TODO: fix
             case Task.RECOGNITION:
                 return RECOGNITION_NUM_EPOCHS
             case Task.PRETRAINING_NTP:
@@ -48,6 +51,8 @@ class Task(Enum):
         match self:
             case Task.GENERATION:
                 return GENERATION_LEARNING_RATE
+            case Task.ENHANCEMENT:
+                return GENERATION_LEARNING_RATE  # TODO: fix
             case Task.RECOGNITION:
                 return RECOGNITION_LEARNING_RATE
             case Task.PRETRAINING_NTP:

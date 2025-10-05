@@ -40,3 +40,21 @@ class TokenRepr(Repr):
         tokeniser = self._get_tokeniser(id)
         token_ids = tokeniser.convert_tokens_to_ids(self._tokens)
         return torch.tensor(token_ids, dtype=torch.long)
+    
+    
+if __name__ == "__main__":
+    from core.data_schema import Parsed
+    from tokeniser.factory import DefaultTokeniserFactory
+    from core.repr import TokenReprId, TokenReprType
+    
+    parsed = Parsed.load_random()
+    ink = parsed.ink
+    ink.visualise(name="(Original) Text: " + parsed.text)
+
+    for delta in [1, 2, 4, 8, 16, 32, 64, 128, 256]:
+        token_repr_id = TokenReprId(delta=delta, type=TokenReprType.SCRIBE)
+        tokeniser = DefaultTokeniserFactory.create(token_repr_id)
+        tokens = tokeniser.tokenise(ink)
+        print(tokeniser._preprocessor)
+        ink = tokeniser.detokenise(tokens)
+        ink.visualise(name=f"(Delta {delta}) Text: " + parsed.text)

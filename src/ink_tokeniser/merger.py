@@ -1,7 +1,8 @@
 from typing import Iterator, Protocol
 
-from ink_tokeniser.tokens import RegularToken, RegularTokenType
 from tokenizers.models import BPE
+
+from ink_tokeniser.tokens import RegularToken, RegularTokenType
 
 
 class Merger(Protocol):

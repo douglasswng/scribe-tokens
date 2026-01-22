@@ -2,14 +2,14 @@ from itertools import groupby
 from typing import Iterator
 
 import ujson as json
-from ink_tokeniser.tokens import RegularToken, SpecialToken, SpecialTokenType
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 
-from schemas.ink import DigitalInk
 from ink_tokeniser.factory import TokeniserFactory, TokeniserId, TokenType
 from ink_tokeniser.merger import TokenUnicodeBidict
+from ink_tokeniser.tokens import RegularToken, SpecialToken, SpecialTokenType
+from schemas.ink import DigitalInk
 
 
 class InkBpeTrainer:
@@ -59,10 +59,7 @@ class InkBpeTrainer:
             SpecialToken(type=SpecialTokenType.END),
             SpecialToken(type=SpecialTokenType.UP),
         ]
-        if (
-            self.tokeniser_id.type == TokenType.ABS
-            or self.tokeniser_id.type == TokenType.REL
-        ):
+        if self.tokeniser_id.type == TokenType.ABS or self.tokeniser_id.type == TokenType.REL:
             special_tokens.append(SpecialToken(type=SpecialTokenType.UNKNOWN))
         if self.tokeniser_id.type == TokenType.SCRIBE:
             special_tokens.append(SpecialToken(type=SpecialTokenType.DOWN))

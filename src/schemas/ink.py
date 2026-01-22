@@ -96,6 +96,9 @@ class Stroke[T: (float, int)](BaseModel):
 
         smoothed_x = savgol_filter(x_coords, window_length, polyorder)
         smoothed_y = savgol_filter(y_coords, window_length, polyorder)
+        
+        assert isinstance(smoothed_x, np.ndarray)
+        assert isinstance(smoothed_y, np.ndarray)
 
         smoothed_points = [Point(x=float(x), y=float(y)) for x, y in zip(smoothed_x, smoothed_y)]
         return Stroke(points=smoothed_points)
@@ -230,6 +233,8 @@ class DigitalInk[T: (float, int)](BaseModel):
         return DigitalInk(strokes=[stroke.dedup() for stroke in self.strokes])
 
     def visualise(self, connect: bool = True, name: str | None = None) -> None:
+        TMP_DIR.mkdir(parents=True, exist_ok=True)
+
         fig, ax = self._create_plot(connect=connect)
 
         count = len(list(TMP_DIR.iterdir()))
@@ -237,7 +242,6 @@ class DigitalInk[T: (float, int)](BaseModel):
         name = name[:100]
 
         pdf_path = TMP_DIR / f"{name}.pdf"
-        pdf_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
         plt.close(fig)
 

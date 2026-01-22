@@ -2,11 +2,11 @@ from core.utils.distributed_context import distributed_context
 
 from core.model import LocalModel, ModelFactory, ModelId, Task
 from core.repr import ReprId, VectorReprId
+from ink_tokeniser.factory import DefaultTokeniserFactory
 from model.models.generation import GenerationModel
 from model.models.pretraining import PretrainingModel
 from model.models.recognition import RecognitionModel
 from model.modules.embedder import Embedder, TokenEmbedder, VectorEmbedder
-from ink_tokeniser.factory import DefaultTokeniserFactory
 
 
 class ReprEmbedderFactory:

@@ -1,12 +1,12 @@
 from typing import Self
 
 import torch
-from core.utils import get_stroke_point_iterator
 from pydantic import BaseModel
 from torch import Tensor
 
-from core.data_schema import DigitalInk, Point, Stroke
-from core.repr import Repr, VectorReprId
+from ink_repr.repr import InkRepr
+from schemas.ink import DigitalInk, Point, Stroke
+from utils.point_iterator import get_stroke_point_iterator
 
 
 class Point3(BaseModel):
@@ -28,7 +28,7 @@ class Point3(BaseModel):
         return torch.tensor([self.dx, self.dy, int(self.pen_up)], dtype=torch.float32)
 
 
-class Point3Repr(Repr):
+class Point3Repr(InkRepr):
     def __init__(self, points: list[Point3]):
         self._points = points
 
@@ -36,20 +36,20 @@ class Point3Repr(Repr):
         return " → ".join([str(point) for point in self._points])
 
     @classmethod
-    def from_ink(cls, id: VectorReprId, ink: DigitalInk) -> Self:
+    def from_ink(cls, ink: DigitalInk) -> Self:
         points: list[Point3] = []
         for point in get_stroke_point_iterator(ink).rel_points:
             points.append(Point3(dx=point.x, dy=point.y, pen_up=point.is_stroke_end))
         return cls(points)
 
     @classmethod
-    def from_tensor(cls, id: VectorReprId, tensor: Tensor) -> Self:
+    def from_tensor(cls, tensor: Tensor) -> Self:
         points: list[Point3] = []
         for point_tensor in tensor:
             points.append(Point3.from_tensor(point_tensor))
         return cls(points=points)
 
-    def to_ink(self, id: VectorReprId) -> DigitalInk:
+    def to_ink(self) -> DigitalInk:
         strokes: list[Stroke] = []
         position = Point(x=0.0, y=0.0)
         stroke_points: list[Point] = [position]
@@ -61,5 +61,5 @@ class Point3Repr(Repr):
                 stroke_points = []
         return DigitalInk(strokes=strokes)
 
-    def to_tensor(self, id: VectorReprId) -> Tensor:
+    def to_tensor(self) -> Tensor:
         return torch.stack([point.to_tensor() for point in self._points], dim=0)

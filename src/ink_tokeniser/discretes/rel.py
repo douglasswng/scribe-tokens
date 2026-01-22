@@ -1,6 +1,6 @@
-from schemas.ink import DigitalInk, Point, Stroke
 from ink_tokeniser.discretes.discrete import DiscreteTokeniser
 from ink_tokeniser.tokens import Coord, RegularToken, RegularTokenType, Token
+from schemas.ink import DigitalInk, Point, Stroke
 from utils.point_iterator import get_stroke_point_iterator
 
 

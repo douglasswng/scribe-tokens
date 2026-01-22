@@ -1,63 +1,20 @@
 from functools import lru_cache
 from pathlib import Path
-from enum import StrEnum
-from typing import Iterator, Self
 
 import ujson as json
-from utils.distributed_context import distributed_context
-from ink_tokeniser.preprocessor import DeltaSmoothPreprocessor
-from ink_tokeniser.trained import TrainedTokeniser
 
-from constants import DELTA, SCRIBE_DOWNSAMPLE_FACTOR, TOKENISERS_DIR, VOCAB_SIZE
+from constants import SCRIBE_DOWNSAMPLE_FACTOR
 from ink_tokeniser.discretes.abs import AbsTokeniser
 from ink_tokeniser.discretes.discrete import DiscreteTokeniser
 from ink_tokeniser.discretes.rel import RelTokeniser
 from ink_tokeniser.discretes.scribe import ScribeTokeniser
 from ink_tokeniser.discretes.text import TextTokeniser
-from ink_tokeniser.tokens import RegularToken, Token, TokenParser
+from ink_tokeniser.id import TokeniserId, TokenType
+from ink_tokeniser.preprocessor import DeltaSmoothPreprocessor
 from ink_tokeniser.tokeniser import Tokeniser
-
-
-class TokenType(StrEnum):
-    SCRIBE = "ScribeTokens"
-    ABS = "AbsTokens"
-    REL = "RelTokens"
-    TEXT = "TextTokens"
-
-
-class TokeniserId:
-    def __init__(self, type: TokenType, delta: int | float, vocab_size: int | None = None):
-        self.type = type
-        self.delta = delta
-        self.vocab_size = vocab_size
-
-    def __str__(self) -> str:
-        return f"{self.type}-{self.delta} (vocab_size: {self.vocab_size})"
-    
-    @property
-    def tokeniser_path(self) -> Path:
-        return TOKENISERS_DIR / self.type / f"{self.type}-{self.delta}"
-    
-    @property
-    def vocab_path(self) -> Path:
-        return self.tokeniser_path / "vocab.json"
-
-    @property
-    def merges_path(self) -> Path:
-        return self.tokeniser_path / "merges.txt"
-    
-    @classmethod
-    def iterate(cls) -> Iterator[Self]:
-        for type in TokenType:
-            id = cls(type=type, delta=DELTA, vocab_size=VOCAB_SIZE)
-            if not id.tokeniser_path.exists():
-                if distributed_context.is_master:
-                    print(f"Warning: {id} does not exist")
-                continue
-            yield id
-            
-    def is_scribe(self) -> bool:
-        return self.type == TokenType.SCRIBE
+from ink_tokeniser.tokens import RegularToken, Token, TokenParser
+from ink_tokeniser.trained import TrainedTokeniser
+from utils.distributed_context import distributed_context
 
 
 class DiscreteFactory:
@@ -152,7 +109,7 @@ if __name__ == "__main__":
     ink.visualise()
     print(f"DigitalInk length: {len(ink)}")
 
-    for id in TokeniserId.iterate():
+    for id in TokeniserId.get_defaults():
         tokeniser = TokeniserFactory.create(id)
         tokens = tokeniser.tokenise(ink)
         print(f"{id} length: {len(tokens)}")

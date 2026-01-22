@@ -1,9 +1,8 @@
 from ink_tokeniser.discretes.discrete import DiscreteTokeniser
-from ink_tokeniser.tokens import Token
-
-from schemas.ink import DigitalInk
 from ink_tokeniser.preprocessor import Preprocessor
+from ink_tokeniser.tokens import Token
 from ink_tokeniser.trained import TrainedTokeniser
+from schemas.ink import DigitalInk
 
 
 class Tokeniser:

@@ -1,7 +1,7 @@
 from typing import Protocol
 
-from schemas.ink import DigitalInk
 from ink_tokeniser.tokens import SpecialToken, SpecialTokenType, Token
+from schemas.ink import DigitalInk
 
 
 class DiscreteTokeniser(Protocol):

@@ -1,9 +1,8 @@
 from functools import cached_property
 from itertools import groupby
 
-from ink_tokeniser.tokens import RegularToken, SpecialToken, SpecialTokenType, Token
-
 from ink_tokeniser.merger import HFMerger, Merger
+from ink_tokeniser.tokens import RegularToken, SpecialToken, SpecialTokenType, Token
 
 
 class TrainedTokeniser:

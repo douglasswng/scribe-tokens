@@ -13,7 +13,7 @@ class TokenRepr(InkRepr):
     def __init__(self, tokens: list[Token], tokeniser: Tokeniser):
         self._tokens = tokens
         self._tokeniser = tokeniser
-        
+
     def __str__(self) -> str:
         return "\n".join([str(token) for token in self._tokens])
 

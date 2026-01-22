@@ -3,7 +3,9 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from core.constants import (
+from torch import Tensor
+
+from constants import (
     DROPOUT,
     HIDDEN_DIM,
     NUM_CHARS,
@@ -11,7 +13,6 @@ from core.constants import (
     UNKNOWN_TOKEN_RATE,
     VOCAB_SIZE,
 )
-from torch import Tensor
 
 type MDNOutput = tuple[
     Tensor, Tensor, Tensor, Tensor, Tensor
@@ -52,8 +53,8 @@ class VectorEmbedder(Embedder):
 
         mixtures = torch.softmax(mixtures, dim=-1)
         means = means.view(*means.size()[:-1], NUM_MIXTURES, 2)
-        stds = F.softplus(stds.view(*stds.size()[:-1], NUM_MIXTURES, 2)) + 0.1
-        rhos = torch.tanh(rhos) * 0.99
+        stds = F.softplus(stds.view(*stds.size()[:-1], NUM_MIXTURES, 2)) + 0.1  # stability
+        rhos = torch.tanh(rhos) * 0.99  # stability
 
         return mixtures, means, stds, rhos, pen_states
 

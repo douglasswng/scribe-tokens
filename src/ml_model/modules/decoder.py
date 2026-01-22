@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from core.constants import DROPOUT, FFN_FACTOR, HIDDEN_DIM, MAX_LEN, NUM_HEADS, NUM_LAYERS
+from model.modules.decoder_layer import TransformerDecoderLayer
 from torch import Tensor
 
-from model.modules.decoder_layer import TransformerDecoderLayer
+from constants import DROPOUT, FFN_FACTOR, HIDDEN_DIM, MAX_LEN, NUM_HEADS, NUM_LAYERS
 
 
 class TransformerDecoder(nn.Module):

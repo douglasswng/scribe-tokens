@@ -1,6 +1,6 @@
 from torch import Tensor
 
-from ink_repr.id import ReprId, TokeniserId, VectorId, VectorType
+from ink_repr.id import ReprId, TokeniserId, VectorReprId, VectorType
 from ink_repr.repr import InkRepr
 from ink_repr.reprs.point3 import Point3Repr
 from ink_repr.reprs.point5 import Point5Repr
@@ -14,9 +14,9 @@ class ReprFactory:
     def from_ink(cls, ink: DigitalInk, repr_id: ReprId) -> InkRepr:
         """Create a representation from digital ink based on ID."""
         match repr_id:
-            case VectorId(type=VectorType.POINT3):
+            case VectorReprId(type=VectorType.POINT3):
                 return Point3Repr.from_ink(ink)
-            case VectorId(type=VectorType.POINT5):
+            case VectorReprId(type=VectorType.POINT5):
                 return Point5Repr.from_ink(ink)
             case TokeniserId():
                 tokeniser = TokeniserFactory.create(repr_id)
@@ -28,9 +28,9 @@ class ReprFactory:
     def from_tensor(cls, tensor: Tensor, repr_id: ReprId) -> InkRepr:
         """Create a representation from tensor based on ID."""
         match repr_id:
-            case VectorId(type=VectorType.POINT3):
+            case VectorReprId(type=VectorType.POINT3):
                 return Point3Repr.from_tensor(tensor)
-            case VectorId(type=VectorType.POINT5):
+            case VectorReprId(type=VectorType.POINT5):
                 return Point5Repr.from_tensor(tensor)
             case TokeniserId():
                 tokeniser = TokeniserFactory.create(repr_id)
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     ink = parsed.ink
     ink.visualise()
 
-    for repr_id in TokeniserId.get_defaults() + VectorId.get_defaults():
+    for repr_id in TokeniserId.create_defaults() + VectorReprId.create_defaults():
         print(f"Repr ID: {repr_id}")
         repr = ReprFactory.from_ink(ink, repr_id)
 

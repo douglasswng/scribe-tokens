@@ -2,15 +2,15 @@ from functools import partial
 
 import torch
 from core.constants import HIDDEN_DIM
-from torch import Tensor
-
 from core.data_schema import Batch, DigitalInk, Instance, PairBatch
-from core.model import LocalModel, ModelId, Tracker
 from model.models.batch_utils import BatchPreper
 from model.models.loss_mixin import LossMixin
 from model.modules.decoder import TransformerDecoder
 from model.modules.embedder import CharEmbedder, Embedder, MDNOutput
 from repr.factory import DefaultReprFactory
+from torch import Tensor
+
+from core.model import LocalModel, ModelId, Tracker
 
 
 class GenerationModel(LocalModel, LossMixin):
@@ -183,10 +183,10 @@ class GenerationModel(LocalModel, LossMixin):
 
 if __name__ == "__main__":
     from core.utils import distributed_context
+    from model.factory import ReprEmbedderFactory
 
     from core.model import ModelId, Task
     from dataloader.create import create_dataloaders
-    from model.factory import ReprEmbedderFactory
 
     for model_id in ModelId.create_task_model_ids(Task.GENERATION)[::]:
         print(model_id)

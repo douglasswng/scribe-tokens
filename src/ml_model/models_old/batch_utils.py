@@ -1,10 +1,10 @@
 import torch
+from core.data_schema import Batch, PairBatch, SingletonBatch
+from model.modules.embedder import CharEmbedder, Embedder
 from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 
-from core.data_schema import Batch, PairBatch, SingletonBatch
 from core.model import Task
-from model.modules.embedder import CharEmbedder, Embedder
 
 
 class BatchPreper:

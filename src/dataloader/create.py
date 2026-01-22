@@ -1,32 +1,14 @@
 from functools import partial
-from typing import cast
 
-from core.constants import BATCH_SIZE
-from core.utils import distributed_context
+from model.id import ModelId
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 
-from core.data_schema import Batch, Instance, PairBatch, SingletonBatch
-from core.model import ModelId
+from constants import BATCH_SIZE
 from dataloader.dataset import create_datasets
 from dataloader.split import create_datasplit
-
-
-def collate_fn(instances: list[Instance | tuple[Instance, Instance]]) -> Batch:
-    first_instance = instances[0]
-    is_singleton_batch = isinstance(first_instance, Instance)
-
-    if not all(isinstance(instance, type(first_instance)) for instance in instances):
-        raise ValueError(
-            "Mixed instance types in batch - all instances must be either Instance or tuple[Instance, Instance]"
-        )
-
-    if is_singleton_batch:
-        return SingletonBatch(instances=cast(list[Instance], instances))
-    else:
-        tuple_instances = cast(list[tuple[Instance, Instance]], instances)
-        main_instances, ref_instances = zip(*tuple_instances)
-        return PairBatch(main_instances=list(main_instances), ref_instances=list(ref_instances))
+from schemas.batch import Batch
+from utils.distributed_context import distributed_context
 
 
 def create_dataloader(
@@ -56,7 +38,7 @@ def create_dataloader(
         shuffle=shuffle,
         sampler=sampler,
         num_workers=num_workers,
-        collate_fn=collate_fn,
+        collate_fn=lambda x: Batch(instances=x),
         pin_memory=pin_memory,
         drop_last=drop_last,
         persistent_workers=persistent_workers,

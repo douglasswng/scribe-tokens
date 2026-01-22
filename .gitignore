@@ -6,10 +6,6 @@
 __pycache__
 *.ipynb
 .env
-del*
-/data_demo/
-/artifacts_demo/
 
-!/artifacts/tokenisers/
 !/artifacts/results/
 !/artifacts/figures/

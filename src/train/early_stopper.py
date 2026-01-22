@@ -1,4 +1,4 @@
-from core.train.stats import EpochStats
+from train.stats import EpochStats
 
 
 class EarlyStopper:

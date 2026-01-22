@@ -31,10 +31,6 @@ class Parsed(BaseModel):
         print(f"Random path: {random_path}")
         return cls.from_path(random_path)
 
-    @classmethod
-    def load_test(cls) -> Self:
-        return cls(id="test", text="test", writer="test", ink=DigitalInk.load_test())
-
     def visualise(self) -> None:
         self.ink.visualise(name=self.text)
 

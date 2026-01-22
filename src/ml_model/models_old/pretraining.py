@@ -1,8 +1,9 @@
 from core.data_schema import Batch, SingletonBatch
-from core.model import ModelId, Tracker
 from model.models.generation import GenerationModel
 from model.modules.decoder import TransformerDecoder
 from model.modules.embedder import Embedder
+
+from core.model import ModelId, Tracker
 
 
 class PretrainingModel(GenerationModel):
@@ -27,10 +28,10 @@ class PretrainingModel(GenerationModel):
 
 if __name__ == "__main__":
     from core.utils import distributed_context
+    from model.factory import ReprEmbedderFactory
 
     from core.model import ModelId, Task
     from dataloader.create import create_dataloaders
-    from model.factory import ReprEmbedderFactory
 
     for model_id in ModelId.create_task_model_ids(Task.PRETRAINING_NTP)[::-1]:
         print(model_id)

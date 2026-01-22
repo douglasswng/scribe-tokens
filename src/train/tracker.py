@@ -1,60 +1,101 @@
-from core.constants import (
-    BATCH_SIZE,
-    DELTA,
-    DROPOUT,
-    FFN_FACTOR,
-    HIDDEN_DIM,
-    NUM_HEADS,
-    NUM_LAYERS,
-    PATIENCE_FACTOR,
-    TRACKERS_DIR,
-    VOCAB_SIZE,
-    WEIGHT_DECAY,
-)
-from core.utils import distributed_context
+from pathlib import Path
+from typing import Protocol
 
-from core.model import ModelId
-from core.model.tracker import MLFlowTracker, SwanLabTracker, Tracker
+import mlflow
+import numpy as np
+import swanlab
+from PIL import Image
+
+type ImageType = np.ndarray | Image.Image
 
 
-class DefaultTracker(Tracker):
-    def __init__(self, tracker_name: str, model_id: ModelId):
-        if distributed_context.is_worker:
-            return
+class Tracker(Protocol):
+    def begin_experiment(self, name: str, artifact_dir: str | Path) -> None: ...
+    def begin_run(self, tags: list[str], run_name: str) -> None: ...
+    def log_params(self, params: dict[str, float]) -> None: ...
+    def log_metrics(self, metrics: dict[str, float]) -> None: ...
+    def log_image(self, image: ImageType, name: str, caption: str | None = None) -> None: ...
+    def is_active(self) -> bool: ...
+    def end_run(self) -> None: ...
 
-        self.begin_experiment(name="ScribeTokens0930", artifact_dir=TRACKERS_DIR / tracker_name)
-        self.begin_run(tags=[model_id.task.value, str(model_id.repr_id)], run_name=str(model_id))
 
-        # Get task-specific hyperparameters
-        learning_rate = model_id.task.learning_rate
-        num_epochs = model_id.task.num_epochs
-        patience = int(PATIENCE_FACTOR * num_epochs)
+class MLFlowTracker(Tracker):
+    def __init__(self):
+        self.step_counters: dict[str, int] = {}
 
-        self.log_params(
-            {
-                "batch_size": BATCH_SIZE,
-                "learning_rate": learning_rate,
-                "weight_decay": WEIGHT_DECAY,
-                "num_epochs": num_epochs,
-                "patience": patience,
-                "delta": DELTA,
-                "hidden_dim": HIDDEN_DIM,
-                "num_layers": NUM_LAYERS,
-                "num_heads": NUM_HEADS,
-                "dropout": DROPOUT,
-                "vocab_size": VOCAB_SIZE,
-                "ffn_factor": FFN_FACTOR,
-            }
+    def begin_experiment(self, name: str, artifact_dir: str | Path) -> None:
+        mlflow.set_tracking_uri(artifact_dir)
+        experiment = mlflow.get_experiment_by_name(name)
+        if experiment is None:
+            mlflow.create_experiment(name=name)
+        mlflow.set_experiment(name)
+
+    def begin_run(self, tags: list[str], run_name: str) -> None:
+        if self.is_active():
+            self.end_run()
+
+        mlflow.start_run(run_name=run_name, tags={tag: tag for tag in tags})
+        self.step_counters.clear()
+
+    def log_params(self, params: dict[str, float]) -> None:
+        mlflow.log_params(params)
+
+    def log_metrics(self, metrics: dict[str, float]) -> None:
+        for metric_name, value in metrics.items():
+            current_step = self.step_counters.get(metric_name, 0)
+            mlflow.log_metric(metric_name, value, step=current_step)
+            self.step_counters[metric_name] = current_step + 1
+
+    def log_image(self, image: ImageType, name: str, caption: str | None = None) -> None:
+        mlflow.log_image(image, f"{name}: {caption or ''}")
+
+    def end_run(self) -> None:
+        mlflow.end_run()
+
+    def is_active(self) -> bool:
+        return mlflow.active_run() is not None
+
+
+class SwanLabTracker(Tracker):
+    def __init__(self):
+        self.tracking_uri: str | Path | None = None
+        self.experiment_name: str | None = None
+
+    def begin_experiment(self, name: str, artifact_dir: str | Path) -> None:
+        self.tracking_uri = artifact_dir
+        self.experiment_name = name
+
+    def begin_run(self, tags: list[str], run_name: str) -> None:
+        if self.experiment_name is None or self.tracking_uri is None:
+            raise ValueError(
+                "Experiment name or tracking uri is not set, call begin_experiment() first"
+            )
+
+        if self.is_active():
+            self.end_run()
+
+        swanlab.init(
+            project=self.experiment_name,
+            experiment_name=run_name,
+            tags=tags,
+            logdir=str(self.tracking_uri),
         )
 
+    def log_params(self, params: dict[str, float]) -> None:
+        if swanlab.config is None:
+            raise RuntimeError("SwanLab is not initialized. Call begin_run() first.")
 
-class DefaultMLFlowTracker(DefaultTracker, MLFlowTracker):
-    def __init__(self, model_id: ModelId):
-        MLFlowTracker.__init__(self)
-        DefaultTracker.__init__(self, tracker_name="mlflow", model_id=model_id)
+        for key, value in params.items():
+            swanlab.config[key] = value
 
+    def log_metrics(self, metrics: dict[str, float]) -> None:
+        swanlab.log(metrics)
 
-class DefaultSwanLabTracker(DefaultTracker, SwanLabTracker):
-    def __init__(self, model_id: ModelId):
-        SwanLabTracker.__init__(self)
-        DefaultTracker.__init__(self, tracker_name="swanlab", model_id=model_id)
+    def log_image(self, image: ImageType, name: str, caption: str | None = None) -> None:
+        swanlab.log({name: swanlab.Image(image, caption=caption or name)})
+
+    def end_run(self) -> None:
+        swanlab.finish()
+
+    def is_active(self) -> bool:
+        return swanlab.run.get_run() is not None

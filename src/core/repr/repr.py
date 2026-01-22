@@ -2,8 +2,8 @@ from typing import Protocol, Self
 
 from torch import Tensor
 
-from core.repr.id import ReprId
 from core.data_schema import DigitalInk
+from core.repr.id import ReprId
 
 
 class Repr(Protocol):

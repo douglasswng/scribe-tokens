@@ -1,8 +1,9 @@
 import random
-import numpy as np
 
-from core.data_schema import Parsed, DigitalInk
-from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA, AUGMENT_PROB
+import numpy as np
+from core.constants import AUGMENT_PROB, JITTER_SIGMA, ROTATE_ANGLE, SCALE_RANGE, SHEAR_FACTOR
+
+from core.data_schema import DigitalInk, Parsed
 
 
 def scale_coords(coords: list[np.ndarray], scale_factor: float) -> list[np.ndarray]:
@@ -35,7 +36,7 @@ def jitter_coords(coords: list[np.ndarray], sigma: float) -> list[np.ndarray]:
     """Apply jitter (random noise) to coordinates."""
     if sigma == 0:
         return coords
-    
+
     jittered_coords = []
     for stroke_coords in coords:
         if len(stroke_coords) > 0:
@@ -60,7 +61,7 @@ class AugmenterConfig:
 
         self.reverse = random.random() <= AUGMENT_PROB
 
-    def _sample_arg(self, max_val: float, min_val: float=0, default: float=0) -> float:
+    def _sample_arg(self, max_val: float, min_val: float = 0, default: float = 0) -> float:
         if random.random() <= AUGMENT_PROB:
             return random.uniform(min_val, max_val)
         return default
@@ -74,7 +75,7 @@ class Augmenter:
         # Convert to coordinates
         coords = parsed.ink.to_coords()
         np_coords = [np.array(stroke) for stroke in coords]
-        
+
         # Apply transformations in sequence
         np_coords = scale_coords(np_coords, cls._config.scale_factor)
         np_coords = shear_coords(np_coords, cls._config.shear_factor)
@@ -83,19 +84,19 @@ class Augmenter:
 
         # if cls._config.reverse:
         #     np_coords = reverse_coords(np_coords)
-        
+
         # Convert back to DigitalInk
         augmented_ink = DigitalInk.from_coords(np_coords)
         return parsed.model_copy(update={"ink": augmented_ink})
-    
+
     @classmethod
     def reset_config(cls):
         cls._config = AugmenterConfig()
 
 
 if __name__ == "__main__":
-    from repr.factory import DefaultReprFactory
     from core.repr import TokenReprId
+    from repr.factory import DefaultReprFactory
 
     parsed = Parsed.load_random()
     parsed.visualise()

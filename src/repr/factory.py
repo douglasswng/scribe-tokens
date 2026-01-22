@@ -1,10 +1,10 @@
 from torch import Tensor
 
-from core.repr import ReprFactory, VectorReprId, TokenReprId, ReprId, Repr, VectorReprType
 from core.data_schema import DigitalInk
-from repr.reprs.tokens import TokenRepr
+from core.repr import Repr, ReprFactory, ReprId, TokenReprId, VectorReprId, VectorReprType
 from repr.reprs.point3 import Point3Repr
 from repr.reprs.point5 import Point5Repr
+from repr.reprs.tokens import TokenRepr
 
 
 class DefaultReprFactory(ReprFactory):
@@ -17,7 +17,7 @@ class DefaultReprFactory(ReprFactory):
                 return Point5Repr
             case _:
                 raise ValueError(f"Invalid vector repr type: {id.type}")
-            
+
     @classmethod
     def ink_to_repr(cls, id: ReprId, ink: DigitalInk) -> Repr:
         match id:
@@ -27,7 +27,7 @@ class DefaultReprFactory(ReprFactory):
                 return TokenRepr.from_ink(id, ink)
             case _:
                 raise ValueError(f"Invalid repr id: {id}")
-            
+
     @classmethod
     def tensor_to_repr(cls, id: ReprId, tensor: Tensor) -> Repr:
         match id:
@@ -37,10 +37,11 @@ class DefaultReprFactory(ReprFactory):
                 return TokenRepr.from_tensor(id, tensor)
             case _:
                 raise ValueError(f"Invalid repr id: {id}")
-            
+
 
 if __name__ == "__main__":
     import torch
+
     from core.data_schema import Parsed
 
     parsed = Parsed.load_random()
@@ -53,7 +54,7 @@ if __name__ == "__main__":
 
         print(str(repr)[:1000])
         print()
-        
+
         tensor1 = DefaultReprFactory.repr_to_tensor(repr_id, repr)
         tensor2 = DefaultReprFactory.ink_to_tensor(repr_id, ink)
         assert torch.equal(tensor1, tensor2)
@@ -63,5 +64,5 @@ if __name__ == "__main__":
 
         print(ink1)
         ink1.visualise()
-        
+
         raise

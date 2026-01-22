@@ -1,12 +1,12 @@
 from typing import Self
 
 import torch
-from torch import Tensor
-from pydantic import BaseModel
-
-from core.repr import Repr, VectorReprId
-from core.data_schema import DigitalInk, Stroke, Point
 from core.utils import get_stroke_point_iterator
+from pydantic import BaseModel
+from torch import Tensor
+
+from core.data_schema import DigitalInk, Point, Stroke
+from core.repr import Repr, VectorReprId
 
 
 class Point3(BaseModel):
@@ -16,21 +16,16 @@ class Point3(BaseModel):
 
     def __str__(self) -> str:
         return f"({self.dx}, {self.dy}, {self.pen_up})"
-    
+
     @classmethod
-    def from_tensor(cls, tensor: Tensor) -> 'Point3':
+    def from_tensor(cls, tensor: Tensor) -> "Point3":
         assert tensor.shape == (3,)
         assert tensor[2].item() in {0.0, 1.0}
 
-        return cls(dx=tensor[0].item(),
-                   dy=tensor[1].item(),
-                   pen_up=tensor[2].item() == 1.0)
-    
+        return cls(dx=tensor[0].item(), dy=tensor[1].item(), pen_up=tensor[2].item() == 1.0)
+
     def to_tensor(self) -> Tensor:
-        return torch.tensor([self.dx,
-                             self.dy,
-                             int(self.pen_up)],
-                            dtype=torch.float32)
+        return torch.tensor([self.dx, self.dy, int(self.pen_up)], dtype=torch.float32)
 
 
 class Point3Repr(Repr):
@@ -38,7 +33,7 @@ class Point3Repr(Repr):
         self._points = points
 
     def __str__(self) -> str:
-        return ' → '.join([str(point) for point in self._points])
+        return " → ".join([str(point) for point in self._points])
 
     @classmethod
     def from_ink(cls, id: VectorReprId, ink: DigitalInk) -> Self:
@@ -65,6 +60,6 @@ class Point3Repr(Repr):
                 strokes.append(Stroke(points=stroke_points))
                 stroke_points = []
         return DigitalInk(strokes=strokes)
-    
+
     def to_tensor(self, id: VectorReprId) -> Tensor:
         return torch.stack([point.to_tensor() for point in self._points], dim=0)

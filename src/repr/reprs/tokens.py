@@ -3,10 +3,10 @@ from typing import Self
 import torch
 from torch import Tensor
 
+from core.data_schema import DigitalInk
 from core.repr import Repr, TokenReprId
 from core.tokeniser import Token, Tokeniser
-from core.data_schema import DigitalInk
-from tokeniser.factory import DefaultTokeniserFactory
+from ink_tokeniser.factory import DefaultTokeniserFactory
 
 
 class TokenRepr(Repr):
@@ -14,12 +14,12 @@ class TokenRepr(Repr):
         self._tokens = tokens
 
     def __str__(self) -> str:
-        return '\n'.join([str(token) for token in self._tokens])
-    
+        return "\n".join([str(token) for token in self._tokens])
+
     @classmethod
     def _get_tokeniser(cls, id: TokenReprId) -> Tokeniser:
         return DefaultTokeniserFactory.create(id)
-    
+
     @classmethod
     def from_ink(cls, id: TokenReprId, ink: DigitalInk) -> Self:
         tokeniser = cls._get_tokeniser(id)
@@ -40,13 +40,13 @@ class TokenRepr(Repr):
         tokeniser = self._get_tokeniser(id)
         token_ids = tokeniser.convert_tokens_to_ids(self._tokens)
         return torch.tensor(token_ids, dtype=torch.long)
-    
-    
+
+
 if __name__ == "__main__":
     from core.data_schema import Parsed
-    from tokeniser.factory import DefaultTokeniserFactory
     from core.repr import TokenReprId, TokenReprType
-    
+    from ink_tokeniser.factory import DefaultTokeniserFactory
+
     parsed = Parsed.load_random()
     ink = parsed.ink
     ink.visualise(name="(Original) Text: " + parsed.text)

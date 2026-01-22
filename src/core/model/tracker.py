@@ -1,11 +1,10 @@
-from typing import Protocol
 from pathlib import Path
+from typing import Protocol
 
-import numpy as np
-from PIL import Image
 import mlflow
+import numpy as np
 import swanlab
-
+from PIL import Image
 
 type ImageType = np.ndarray | Image.Image
 
@@ -69,19 +68,21 @@ class SwanLabTracker(Tracker):
     def begin_run(self, tags: list[str], run_name: str) -> None:
         if self.experiment_name is None:
             raise ValueError("Experiment name is not set")
-        
+
         if self.is_active():
             self.end_run()
-        
-        swanlab.init(project=self.experiment_name,
-                     experiment_name=run_name, 
-                     tags=tags,
-                     logdir=self.tracking_uri)  # type: ignore
+
+        swanlab.init(
+            project=self.experiment_name,
+            experiment_name=run_name,
+            tags=tags,
+            logdir=self.tracking_uri,
+        )  # type: ignore
 
     def log_params(self, params: dict[str, float]) -> None:
         if swanlab.config is None:
             raise RuntimeError("SwanLab is not initialized. Call begin_run() first.")
-        
+
         for key, value in params.items():
             swanlab.config[key] = value
 

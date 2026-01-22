@@ -1,15 +1,15 @@
-from pathlib import Path
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 
-from core.constants import PARSED_DIR, SPLIT_DIR
+from constants import PARSED_DIR, TEST_SPLIT_PATH, TRAIN_SPLIT_PATH, VAL_SPLIT_PATH
 
 
 def load_split_filenames(split_file: Path) -> set[str]:
     """Load the exact filenames from a split file."""
     if not split_file.exists():
         return set()
-    with open(split_file, 'r') as f:
+    with open(split_file, "r") as f:
         # Read and strip whitespace, filter empty lines
         return {line.strip() for line in f if line.strip()}
 
@@ -17,28 +17,23 @@ def load_split_filenames(split_file: Path) -> set[str]:
 @lru_cache(maxsize=1)
 def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
     """Split parsed paths based on predefined split files with exact filename matching."""
-    # Find the dataset directory (assumes there's one subdirectory in parsed/)
-    dataset_dirs = [d for d in PARSED_DIR.iterdir() if d.is_dir()]
-    if not dataset_dirs:
-        raise ValueError(f"No dataset directory found in {PARSED_DIR}")
-    
-    dataset_dir = dataset_dirs[0]  # Use the first dataset directory
-    dataset_name = dataset_dir.name
-    split_dataset_dir = SPLIT_DIR / dataset_name
-    
-    # Load exact filenames from split files
-    train_filenames = load_split_filenames(split_dataset_dir / 'train.txt')
-    test_filenames = load_split_filenames(split_dataset_dir / 'test.txt')
-    
-    # Combine val1 and val2
-    val_filenames = load_split_filenames(split_dataset_dir / 'val1.txt')
-    val_filenames.update(load_split_filenames(split_dataset_dir / 'val2.txt'))
-    
-    # Build paths using exact filename matching
-    train_paths = sorted([dataset_dir / fname for fname in train_filenames if (dataset_dir / fname).exists()])
-    val_paths = sorted([dataset_dir / fname for fname in val_filenames if (dataset_dir / fname).exists()])
-    test_paths = sorted([dataset_dir / fname for fname in test_filenames if (dataset_dir / fname).exists()])
-    
+    train_filenames = load_split_filenames(TRAIN_SPLIT_PATH)
+    val_filenames = load_split_filenames(VAL_SPLIT_PATH)
+    test_filenames = load_split_filenames(TEST_SPLIT_PATH)
+
+    train_paths = []
+    val_paths = []
+    test_paths = []
+    for parsed_path in PARSED_DIR.glob("*.json"):
+        if parsed_path.stem in train_filenames:
+            train_paths.append(parsed_path)
+        elif parsed_path.stem in val_filenames:
+            val_paths.append(parsed_path)
+        elif parsed_path.stem in test_filenames:
+            test_paths.append(parsed_path)
+        else:
+            raise ValueError(f"Parsed path {parsed_path} not found in any split file")
+
     return train_paths, val_paths, test_paths
 
 

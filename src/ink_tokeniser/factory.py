@@ -95,7 +95,7 @@ class TokeniserFactory:
     @classmethod
     @lru_cache(maxsize=128)
     def create(cls, id: TokeniserId) -> Tokeniser:
-        downsample_factor = SCRIBE_DOWNSAMPLE_FACTOR if id.is_scribe else 1
+        downsample_factor = SCRIBE_DOWNSAMPLE_FACTOR if id.is_scribe() else 1
         preprocessor = DeltaSmoothPreprocessor(delta=id.delta, downsample_factor=downsample_factor)
         discrete_tokeniser = DiscreteFactory.create_discrete_tokeniser(id)
         trained_tokeniser = TrainedFactory.from_pretrained(id)
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     ink.visualise()
     print(f"DigitalInk length: {len(ink)}")
 
-    for id in TokeniserId.get_defaults():
+    for id in TokeniserId.create_defaults():
         tokeniser = TokeniserFactory.create(id)
         tokens = tokeniser.tokenise(ink)
         print(f"{id} length: {len(tokens)}")

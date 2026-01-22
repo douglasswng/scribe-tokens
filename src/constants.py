@@ -1,10 +1,14 @@
 from pathlib import Path
 from typing import Literal
 
+from utils.clear_folder import clear_folder
+
 # Paths
 BASE_DIR = Path(__file__).parent.parent
 
 TMP_DIR = BASE_DIR / "tmp"
+clear_folder(TMP_DIR, confirm=False)
+
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 DATA_DIR = BASE_DIR / "data"
 
@@ -16,11 +20,11 @@ TRAIN_SPLIT_PATH = _SPLIT_DIR / "train.txt"
 VAL_SPLIT_PATH = _SPLIT_DIR / "val.txt"
 TEST_SPLIT_PATH = _SPLIT_DIR / "test.txt"
 
-TOKENISERS_DIR = ARTIFACTS_DIR / "tokenisers"
+TOKENISERS_DIR = Path("tokenisers")
+MODELS_DIR = Path("models")
+
 CHECKPOINTS_DIR = ARTIFACTS_DIR / "checkpoints"
-MODELS_DIR = ARTIFACTS_DIR / "models"
 TRACKERS_DIR = ARTIFACTS_DIR / "trackers"
-METRICS_DIR = ARTIFACTS_DIR / "metrics"
 RESULTS_DIR = ARTIFACTS_DIR / "results"
 FIGURES_DIR = ARTIFACTS_DIR / "figures"
 
@@ -51,28 +55,10 @@ NUM_MIXTURES = 20
 UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
 BATCH_SIZE = 64
 WEIGHT_DECAY = 0.01
+NUM_EPOCHS = 300
+LEARNING_RATE = 1e-3
 PATIENCE_FACTOR = 0.1  # 10% of the epochs
-
-# Task-specific hyperparameters
-# Generation task
-GENERATION_NUM_EPOCHS = 300
-GENERATION_LEARNING_RATE = 1e-3
-
-# Recognition task
-RECOGNITION_NUM_EPOCHS = 300
-RECOGNITION_LEARNING_RATE = 1e-3
-
-# Pretraining task
-PRETRAINING_NUM_EPOCHS = 300
-PRETRAINING_LEARNING_RATE = 1e-3
-
-# Recognition SFT task
-RECOGNITION_SFT_NUM_EPOCHS = 50
-RECOGNITION_SFT_LEARNING_RATE = 1e-4
-
-# Generation SFT task
-GENERATION_SFT_NUM_EPOCHS = 50
-GENERATION_SFT_LEARNING_RATE = 1e-4
+PATIENCE = int(PATIENCE_FACTOR * NUM_EPOCHS)
 
 # Augmenter hyperparameters
 SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
@@ -80,3 +66,7 @@ SHEAR_FACTOR = 0.5  # shear factor between (-SHEAR_FACTOR, SHEAR_FACTOR)
 ROTATE_ANGLE = 5  # rotate angle (degrees) between (-ROTATE_ANGLE, ROTATE_ANGLE)
 JITTER_SIGMA = 5  # the std of gaussian noise added to the points
 AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, independently
+
+# GRPO hyperparameters
+GRPO_NUM_SAMPLES = 16  # number of samples to generate per instance for GRPO
+GRPO_BETA = 0.001  # KL penalty coefficient for GRPO

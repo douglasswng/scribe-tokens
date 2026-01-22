@@ -1,10 +1,10 @@
 from typing import Iterator
 
-from dataloader.split import DataSplit, create_datasplit
-from ink_tokeniser.factory import TokeniserId, TokenType
-from ink_tokeniser.trainer import InkBpeTrainer
-from schemas.ink import DigitalInk
-from schemas.parsed import Parsed
+from src.dataloader.split import DataSplit, create_datasplit
+from src.ink_tokeniser.factory import TokeniserId, TokenType
+from src.ink_tokeniser.trainer import InkBpeTrainer
+from src.schemas.ink import DigitalInk
+from src.schemas.parsed import Parsed
 
 DELTAS = [1, 2, 4, 8, 16, 32]
 MAX_VOCAB_SIZE = 100_000

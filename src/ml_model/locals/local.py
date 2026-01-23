@@ -12,6 +12,9 @@ from schemas.batch import Batch
 from schemas.ink import DigitalInk
 from train.tracker import Tracker
 
+type ForwardOutput = Tensor | MDNOutput
+type KVCaches = list[tuple[Tensor, Tensor]]
+
 
 class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
     def __init__(self):
@@ -24,18 +27,17 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
     @abstractmethod
     def monitor(self, batch: Batch) -> None: ...
 
-    def _forward(self, input: Tensor) -> Tensor | MDNOutput:
+    def _forward(
+        self,
+        input: Tensor,
+        start_pos: int = 0,
+        kv_caches: list[tuple[Tensor, Tensor]] | None = None,
+        use_cache: bool = False,
+    ) -> ForwardOutput | tuple[ForwardOutput, KVCaches]:
         """
-        Forward pass through the model.
-
-        Args:
-            input: Input tensor of shape [batch_size, seq_len, hidden_dim]
-
-        Returns:
-            Either logits tensor [batch_size, seq_len, vocab_size] for token models,
-            or MDNOutput tuple for vector models
+        Forward pass through the model with KV cache support.
         """
-        raise NotImplementedError("Subclasses must implement this method")
+        raise NotImplementedError("Subclasses must implement this method for cached generation")
 
     @property
     def local_model(self) -> Self:
@@ -156,7 +158,7 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
         num_generations: int,
     ) -> list[Tensor]:
         """
-        Vectorized sequence generation method that generates multiple sequences in parallel.
+        Vectorized sequence generation using KV cache for efficiency.
 
         Args:
             context: Optional context tensor [seq_len, hidden_dim] or None
@@ -179,23 +181,54 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
         # Track which sequences have finished
         finished = torch.zeros(num_generations, dtype=torch.bool, device=self._device)
 
-        for _ in range(max_len):
-            # Embed generated sequences
-            if gen.ndim == 2:  # Token case: [batch, seq_len]
-                gen_embed = output_embedder.embed(gen)  # [batch, seq_len, hidden_dim]
-            else:  # Vector case: [batch, seq_len, 5]
-                gen_embed = output_embedder.embed(gen)  # [batch, seq_len, hidden_dim]
+        # Initialize KV cache and position tracking
+        kv_caches: list[tuple[Tensor, Tensor]] | None = None
+        start_pos = 0
 
-            # Concatenate context with generated embeddings if context exists
-            if context is not None:
-                # Expand context to match batch size: [batch, context_len, hidden_dim]
-                context_expanded = context.unsqueeze(0).expand(num_generations, -1, -1)
-                input = torch.cat([context_expanded, gen_embed], dim=1)
+        # Process context once if it exists (prefill phase)
+        if context is not None:
+            # Expand context to match batch size: [batch, context_len, hidden_dim]
+            context_expanded = context.unsqueeze(0).expand(num_generations, -1, -1)
+            context_len = context.shape[0]
+
+            # Process context through model with caching
+            result = self._forward(context_expanded, start_pos=0, kv_caches=None, use_cache=True)
+            match result:
+                case (_, list() as caches):
+                    kv_caches = caches
+                case _:
+                    raise ValueError(f"Unsupported result type: {type(result)}")
+            start_pos = context_len
+
+        for step in range(max_len):
+            # Embed only the last generated token/vector
+            if step == 0:
+                # First step: embed the BOS token
+                if gen.ndim == 2:  # Token case: [batch, 1]
+                    gen_embed = output_embedder.embed(gen)  # [batch, 1, hidden_dim]
+                else:  # Vector case: [batch, 1, 5]
+                    gen_embed = output_embedder.embed(gen)  # [batch, 1, hidden_dim]
             else:
-                input = gen_embed
+                # Subsequent steps: embed only the last token/vector
+                if gen.ndim == 2:  # Token case
+                    last_token = gen[:, -1:]  # [batch, 1]
+                    gen_embed = output_embedder.embed(last_token)  # [batch, 1, hidden_dim]
+                else:  # Vector case
+                    last_vector = gen[:, -1:, :]  # [batch, 1, 5]
+                    gen_embed = output_embedder.embed(last_vector)  # [batch, 1, hidden_dim]
 
-            # Forward pass through model-specific logic
-            pred = self._forward(input)
+            # Forward pass through model with caching
+            result = self._forward(
+                gen_embed, start_pos=start_pos, kv_caches=kv_caches, use_cache=True
+            )
+            match result:
+                case (pred, list() as new_caches):
+                    kv_caches = new_caches
+                case _:
+                    raise ValueError(f"Unsupported result type: {type(result)}")
+
+            # Update position for next iteration
+            start_pos += 1
 
             # Sample next token or vector based on embedder type
             if isinstance(output_embedder, VectorEmbedder):

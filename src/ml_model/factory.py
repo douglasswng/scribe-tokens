@@ -66,8 +66,6 @@ class ModelFactory:
 
     @classmethod
     def load_pretrained(cls, model_id: ModelId) -> Model:
-        if not model_id.model_path.exists():
-            return cls.create(model_id)  # TODO: remove this, for testing only
         model = cls._create_local(model_id)
         state_dict = torch.load(model_id.model_path, weights_only=True, map_location="cpu")
         model.load_state_dict(state_dict)

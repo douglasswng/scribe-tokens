@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 
 from dataloader.dataset import IdMapper
-from ml_model.locals.local import LocalModel
+from ml_model.locals.local import KVCaches, LocalModel
 from ml_model.modules.decoder import TransformerDecoder
 from ml_model.modules.embedder import CharEmbedder, Embedder
 from schemas.batch import Batch
@@ -26,11 +26,26 @@ class HTRModel(LocalModel):
             target_target_attr="char_target",
         )
         logits = self._forward(input)
+        assert isinstance(logits, Tensor)
         return {"ce": self.ce_loss(logits, target, mask)}
 
-    def _forward(self, input: Tensor) -> Tensor:
-        output = self._decoder(input)
-        return self._char_embedder.unembed(output)
+    def _forward(
+        self,
+        input: Tensor,
+        start_pos: int = 0,
+        kv_caches: list[tuple[Tensor, Tensor]] | None = None,
+        use_cache: bool = False,
+    ) -> Tensor | tuple[Tensor, KVCaches]:
+        result = self._decoder(input, start_pos=start_pos, kv_caches=kv_caches, use_cache=use_cache)
+        if not use_cache:
+            assert isinstance(result, Tensor)
+            pred = self._char_embedder.unembed(result)
+            return pred
+        else:
+            assert isinstance(result, tuple)
+            output, new_kv_caches = result
+            pred = self._char_embedder.unembed(output)
+            return pred, new_kv_caches
 
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()

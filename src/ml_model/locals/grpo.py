@@ -91,9 +91,8 @@ class GRPOModel(LocalModel):
                 target_ids = gen_sequence[1:].unsqueeze(0)
                 ce = self.ce_loss(logits, target_ids, mask)
                 log_prob = -ce * (seq_len - 1)
-            case tuple():
+            case (mixtures, means, stds, rhos, pen_states):
                 # MDN-based: use nll_loss
-                mixtures, means, stds, rhos, pen_states = pred
                 mixtures_slice = mixtures[:, context_len : context_len + seq_len - 1]
                 means_slice = means[:, context_len : context_len + seq_len - 1]
                 stds_slice = stds[:, context_len : context_len + seq_len - 1]

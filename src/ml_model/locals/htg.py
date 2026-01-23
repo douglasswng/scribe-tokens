@@ -2,9 +2,9 @@ import torch
 from torch import Tensor
 
 from ink_repr.factory import ReprFactory
-from ml_model.locals.local import LocalModel
+from ml_model.locals.local import ForwardOutput, KVCaches, LocalModel
 from ml_model.modules.decoder import TransformerDecoder
-from ml_model.modules.embedder import CharEmbedder, Embedder, MDNOutput
+from ml_model.modules.embedder import CharEmbedder, Embedder
 from schemas.batch import Batch
 from schemas.ink import DigitalInk
 from schemas.instance import Instance
@@ -28,16 +28,31 @@ class HTGModel(LocalModel):
         )
 
         pred = self._forward(input)
-        if batch.instances[0].is_token:
-            assert isinstance(pred, Tensor)
-            return {"ce": self.ce_loss(pred, target, mask)}
-        else:
-            assert isinstance(pred, tuple)
-            return {"nll": self.nll_loss(pred, target, mask)}
+        match pred:
+            case Tensor():
+                return {"ce": self.ce_loss(pred, target, mask)}
+            case tuple() if len(pred) == 5:
+                return {"nll": self.nll_loss(pred, target, mask)}
+            case _:
+                raise ValueError(f"Unsupported prediction type: {type(pred)}")
 
-    def _forward(self, input: Tensor) -> Tensor | MDNOutput:
-        output = self._decoder(input)
-        return self._repr_embedder.unembed(output)
+    def _forward(
+        self,
+        input: Tensor,
+        start_pos: int = 0,
+        kv_caches: list[tuple[Tensor, Tensor]] | None = None,
+        use_cache: bool = False,
+    ) -> ForwardOutput | tuple[ForwardOutput, KVCaches]:
+        result = self._decoder(input, start_pos=start_pos, kv_caches=kv_caches, use_cache=use_cache)
+        if not use_cache:
+            assert isinstance(result, Tensor)
+            pred = self._repr_embedder.unembed(result)
+            return pred
+        else:
+            assert isinstance(result, tuple)
+            output, new_kv_caches = result
+            pred = self._repr_embedder.unembed(output)
+            return pred, new_kv_caches
 
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
@@ -46,7 +61,7 @@ class HTGModel(LocalModel):
 
     @torch.inference_mode()
     def generate_inks(
-        self, instance: Instance, num_generations: int = 1, max_len: int = 50
+        self, instance: Instance, num_generations: int = 1, max_len: int = 500
     ) -> list[DigitalInk]:
         context = self._char_embedder.embed(instance.char)
         gens = self._generate_sequences(

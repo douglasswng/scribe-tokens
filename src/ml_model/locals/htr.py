@@ -45,14 +45,15 @@ class HTRModel(LocalModel):
     @torch.inference_mode()
     def predict_text(self, instance: Instance, max_len: int = 50) -> str:
         context = self._repr_embedder.embed(instance.repr)
-        char_ids = self._generate_sequence(
+        char_ids = self._generate_sequences(
             context=context,
             output_embedder=self._char_embedder,
             bos=instance.char_bos,
             eos=instance.char_eos,
             max_len=max_len,
             temperature=0.0,
-        )
+            num_generations=1,
+        )[0]
         return IdMapper.ids_to_str(char_ids.tolist())
 
 

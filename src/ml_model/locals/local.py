@@ -145,7 +145,7 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
 
         return input, target, mask
 
-    def _generate_sequence(
+    def _generate_sequences(
         self,
         context: Tensor | None,
         output_embedder: Embedder,
@@ -153,29 +153,44 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
         eos: Tensor,
         max_len: int,
         temperature: float,
-    ) -> Tensor:
+        num_generations: int,
+    ) -> list[Tensor]:
         """
-        Generic sequence generation method used by all local models.
+        Vectorized sequence generation method that generates multiple sequences in parallel.
 
         Args:
-            instance: Instance containing metadata (is_token, repr_id, etc.)
             context: Optional context tensor [seq_len, hidden_dim] or None
             output_embedder: Embedder for the output sequence
             bos: Beginning-of-sequence token/vector
             eos: End-of-sequence token/vector
             max_len: Maximum generation length
             temperature: Sampling temperature
+            num_generations: Number of sequences to generate in parallel
 
         Returns:
-            Generated sequence tensor
+            List of generated sequence tensors
         """
-        gen = bos.unsqueeze(0)  # [1, 5] (vector) or [1] (token)
+        # Initialize: [batch_size, 1, ...] where ... is () for tokens or (5,) for vectors
+        if bos.ndim == 0:  # Token case
+            gen = bos.unsqueeze(0).expand(num_generations, 1)  # [batch, 1]
+        else:  # Vector case
+            gen = bos.unsqueeze(0).expand(num_generations, -1).unsqueeze(1)  # [batch, 1, 5]
+
+        # Track which sequences have finished
+        finished = torch.zeros(num_generations, dtype=torch.bool, device=self._device)
+
         for _ in range(max_len):
-            gen_embed = output_embedder.embed(gen).unsqueeze(0)
+            # Embed generated sequences
+            if gen.ndim == 2:  # Token case: [batch, seq_len]
+                gen_embed = output_embedder.embed(gen)  # [batch, seq_len, hidden_dim]
+            else:  # Vector case: [batch, seq_len, 5]
+                gen_embed = output_embedder.embed(gen)  # [batch, seq_len, hidden_dim]
 
             # Concatenate context with generated embeddings if context exists
             if context is not None:
-                input = torch.cat([context.unsqueeze(0), gen_embed], dim=1)
+                # Expand context to match batch size: [batch, context_len, hidden_dim]
+                context_expanded = context.unsqueeze(0).expand(num_generations, -1, -1)
+                input = torch.cat([context_expanded, gen_embed], dim=1)
             else:
                 input = gen_embed
 
@@ -185,18 +200,35 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
             # Sample next token or vector based on embedder type
             if isinstance(output_embedder, VectorEmbedder):
                 assert isinstance(pred, tuple)
-                last_pred = tuple(tensor[0:1, -1] for tensor in pred)
+                # Get predictions for last position: [batch, ...]
+                last_pred = tuple(tensor[:, -1] for tensor in pred)
                 assert len(last_pred) == 5
-                next_vector = self.sample_vector(last_pred, temperature=temperature)
-                next_vector = next_vector.squeeze(0).squeeze(0)
-                gen = torch.cat([gen, next_vector.unsqueeze(0)], dim=0)
-                if torch.any(next_vector * eos == 1.0):
-                    break
+                # Sample vectors: [batch, 1, 5]
+                next_vectors = self.sample_vector(last_pred, temperature=temperature)
+                # Concatenate: [batch, seq_len+1, 5]
+                gen = torch.cat([gen, next_vectors], dim=1)
+
+                # Check for EOS (when any element of element-wise product equals 1.0)
+                # next_vectors: [batch, 1, 5], eos: [5]
+                eos_check = (next_vectors.squeeze(1) * eos.unsqueeze(0) == 1.0).any(dim=-1)
+                finished = finished | eos_check
             else:
                 assert isinstance(pred, Tensor)
-                next_token = self.sample_token(pred[0, -1], temperature=temperature)
-                gen = torch.cat([gen, next_token], dim=0)
-                if int(next_token) == int(eos):
-                    break
+                # Sample tokens: [batch, 1]
+                next_tokens = self.sample_token(pred[:, -1], temperature=temperature)
+                # Concatenate: [batch, seq_len+1]
+                gen = torch.cat([gen, next_tokens], dim=1)
 
-        return gen
+                # Check for EOS
+                eos_check = next_tokens.squeeze(1) == eos
+                finished = finished | eos_check
+
+            # Early stopping if all sequences are done
+            if finished.all():
+                break
+
+        # Convert batched tensor to list of individual sequences
+        if gen.ndim == 2:  # Token case: [batch, seq_len]
+            return [gen[i] for i in range(num_generations)]
+        else:  # Vector case: [batch, seq_len, 5]
+            return [gen[i] for i in range(num_generations)]

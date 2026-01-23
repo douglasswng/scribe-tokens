@@ -42,20 +42,23 @@ class NTPModel(LocalModel):
 
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
-        ink_pred = self.generate_ink(instance)
+        ink_pred = self.generate_inks(instance)[0]
         self._track_ink(ink=ink_pred, task="NTP")
 
     @torch.inference_mode()
-    def generate_ink(self, instance: Instance, max_len: int = 50) -> DigitalInk:
-        gen = self._generate_sequence(
+    def generate_inks(
+        self, instance: Instance, num_generations: int = 1, max_len: int = 50
+    ) -> list[DigitalInk]:
+        gens = self._generate_sequences(
             context=None,
             output_embedder=self.repr_embedder,
             bos=instance.repr_bos,
             eos=instance.repr_eos,
             max_len=max_len,
             temperature=1.0,
+            num_generations=num_generations,
         )
-        return ReprFactory.from_tensor(gen, repr_id=instance.repr_id).to_ink()
+        return [ReprFactory.from_tensor(gen, repr_id=instance.repr_id).to_ink() for gen in gens]
 
 
 if __name__ == "__main__":

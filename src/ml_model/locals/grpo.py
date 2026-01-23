@@ -27,27 +27,30 @@ class GRPOModel(LocalModel):
         self._ref_state = {k: v.clone() for k, v in self.htg_model.state_dict().items()}
 
     @torch.no_grad()
-    def _generate_sample(self, instance: Instance) -> tuple[Tensor, str]:
+    def _generate_samples(self, instance: Instance, num_samples: int) -> list[tuple[Tensor, str]]:
         """
-        Generate a single sample from HWG model.
-        Returns the generated representation sequence and its text prediction from HWR.
+        Generate multiple samples from HTG model for a single instance.
+        Returns list of (generated representation sequence, predicted text) tuples.
         """
-        # Use HWG model's generate_ink method
-        ink = self.htg_model.generate_ink(instance)
+        # Use HTG model's generate_inks method to generate all samples at once
+        inks = self.htg_model.generate_inks(instance, num_generations=num_samples)
 
-        # Convert ink back to tensor for generation sequence
-        gen_repr = ReprFactory.from_ink(ink, repr_id=instance.repr_id).to_tensor()
+        results = []
+        for ink in inks:
+            # Convert ink back to tensor for generation sequence
+            gen_repr = ReprFactory.from_ink(ink, repr_id=instance.repr_id).to_tensor()
 
-        # Create a temporary instance for HWR prediction
-        temp_instance = Instance(
-            parsed=instance.parsed,
-            repr_id=instance.repr_id,
-            repr=gen_repr,
-            char=instance.char,
-        )
-        pred_text = self.htr_model.predict_text(temp_instance)
+            # Create a temporary instance for HTR prediction
+            temp_instance = Instance(
+                parsed=instance.parsed,
+                repr_id=instance.repr_id,
+                repr=gen_repr,
+                char=instance.char,
+            )
+            pred_text = self.htr_model.predict_text(temp_instance)
+            results.append((gen_repr, pred_text))
 
-        return gen_repr, pred_text
+        return results
 
     def _compute_log_prob(
         self, instance: Instance, gen_sequence: Tensor, use_ref_model: bool = False
@@ -125,28 +128,29 @@ class GRPOModel(LocalModel):
         for instance in batch.instances:
             target_text = instance.parsed.text
 
-            # Generate multiple samples
-            rewards = []
-            log_probs = []
+            # Generate samples
+            samples = self._generate_samples(instance, num_samples=self.num_samples)
+            gen_seqs = [sample[0] for sample in samples]
+            pred_texts = [sample[1] for sample in samples]
 
-            for _ in range(self.num_samples):
-                gen_seq, pred_text = self._generate_sample(instance)
-                cer = compute_cer(pred_text, target_text)
-                reward = 1.0 - cer  # Higher reward for lower CER
+            # Calculate rewards
+            cers = [compute_cer(pred_text, target_text) for pred_text in pred_texts]
+            rewards = [1.0 - cer for cer in cers]
 
-                # Compute log probs under current policy
-                log_prob = self._compute_log_prob(instance, gen_seq, use_ref_model=False)
-
-                rewards.append(reward)
-                log_probs.append(log_prob)
-
-                # Compute log probs under reference policy for KL penalty
-                ref_log_prob = self._compute_log_prob(instance, gen_seq, use_ref_model=True)
-                all_ref_log_probs.append(ref_log_prob)
+            # Calculate log probabilities
+            log_probs = [
+                self._compute_log_prob(instance, gen_seq, use_ref_model=False)
+                for gen_seq in gen_seqs
+            ]
+            ref_log_probs = [
+                self._compute_log_prob(instance, gen_seq, use_ref_model=True)
+                for gen_seq in gen_seqs
+            ]
 
             # Accumulate across all instances
             all_rewards.extend(rewards)
             all_log_probs.extend(log_probs)
+            all_ref_log_probs.extend(ref_log_probs)
 
         # Compute GRPO loss using LossMixin method
         grpo_loss, avg_reward = self.grpo_loss(all_rewards, all_log_probs, all_ref_log_probs)

@@ -41,21 +41,24 @@ class HTGModel(LocalModel):
 
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
-        ink_pred = self.generate_ink(instance)
-        self._track_ink(ink=ink_pred, task="HWG", caption=f"Text: {instance.parsed.text}")
+        inks_pred = self.generate_inks(instance, num_generations=1)
+        self._track_ink(ink=inks_pred[0], task="HWG", caption=f"Text: {instance.parsed.text}")
 
-    @torch.inference_mode()  # TODO: batch generation
-    def generate_ink(self, instance: Instance, max_len: int = 50) -> DigitalInk:
+    @torch.inference_mode()
+    def generate_inks(
+        self, instance: Instance, num_generations: int = 1, max_len: int = 50
+    ) -> list[DigitalInk]:
         context = self._char_embedder.embed(instance.char)
-        gen = self._generate_sequence(
+        gens = self._generate_sequences(
             context=context,
             output_embedder=self._repr_embedder,
             bos=instance.repr_bos,
             eos=instance.repr_eos,
             max_len=max_len,
             temperature=1.0,
+            num_generations=num_generations,
         )
-        return ReprFactory.from_tensor(gen, repr_id=instance.repr_id).to_ink()
+        return [ReprFactory.from_tensor(gen, repr_id=instance.repr_id).to_ink() for gen in gens]
 
 
 if __name__ == "__main__":

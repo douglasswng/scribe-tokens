@@ -17,7 +17,7 @@ class HWRModel(LocalModel):
         self._decoder = TransformerDecoder()
 
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
-        input, target, mask = self._prepare_batch_tensors(
+        input, target, mask = self._prepare_batch(
             batch=batch,
             context_embedder=self._repr_embedder,
             target_embedder=self._char_embedder,
@@ -25,17 +25,17 @@ class HWRModel(LocalModel):
             target_input_attr="char_input",
             target_target_attr="char_target",
         )
-
-        output = self._decoder(input)
-        logits = self._char_embedder.unembed(output)
-
+        logits = self._forward(input)
         return {"ce": self.ce_loss(logits, target, mask)}
+
+    def _forward(self, input: Tensor) -> Tensor:
+        output = self._decoder(input)
+        return self._char_embedder.unembed(output)
 
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
         text_true = instance.parsed.text
         text_pred = self.predict_text(instance)
-
         self._track_ink(
             ink=instance.parsed.ink,
             task="HWR",
@@ -44,22 +44,16 @@ class HWRModel(LocalModel):
 
     @torch.inference_mode()
     def predict_text(self, instance: Instance, max_len: int = 50) -> str:
-        if self.training:
-            raise ValueError("Prediction is not supported in training mode")
-
-        input = self._repr_embedder.embed(instance.repr).unsqueeze(0)
-        char_ids: list[int] = [int(instance.char_bos)]
-        for _ in range(max_len):
-            last_char = torch.tensor(char_ids[-1:], device=self._device, dtype=torch.long)
-            last_char = self._char_embedder.embed(last_char).unsqueeze(0)  # [1, 1, hidden_dim]
-            input = torch.cat([input, last_char], dim=1)  # [1, seq_len, hidden_dim]
-            output = self._decoder(input)
-            logits = self._char_embedder.unembed(output)  # [1, seq_len, num_chars]
-            next_char = int(self.sample_token(logits[0, -1], temperature=0.0))
-            char_ids.append(next_char)
-            if next_char == int(instance.char_eos):
-                break
-        return IdMapper.ids_to_str(char_ids)
+        context = self._repr_embedder.embed(instance.repr)
+        char_ids = self._generate_sequence(
+            context=context,
+            output_embedder=self._char_embedder,
+            bos=instance.char_bos,
+            eos=instance.char_eos,
+            max_len=max_len,
+            temperature=0.0,
+        )
+        return IdMapper.ids_to_str(char_ids.tolist())
 
 
 if __name__ == "__main__":

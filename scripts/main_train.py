@@ -1,11 +1,13 @@
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 
-from src.constants import (
+from constants import (
     BATCH_SIZE,
     DELTA,
     DROPOUT,
     FFN_FACTOR,
+    GRPO_BETA,
+    GRPO_NUM_SAMPLES,
     HIDDEN_DIM,
     LEARNING_RATE,
     NUM_EPOCHS,
@@ -16,15 +18,19 @@ from src.constants import (
     VOCAB_SIZE,
     WEIGHT_DECAY,
 )
-from src.dataloader.create import create_dataloaders
-from src.ml_model.factory import ModelFactory
-from src.ml_model.id import ModelId
-from src.train.checkpointer import Checkpointer
-from src.train.state import TrainState
-from src.train.tracker import SwanLabTracker, Tracker
-from src.train.trainer import Trainer
+from dataloader.create import create_dataloaders
+from ml_model.factory import ModelFactory
+from ml_model.id import ModelId
+from ml_trainer.checkpointer import Checkpointer
+from ml_trainer.config import TrainerConfig
+from ml_trainer.state import TrainState
+from ml_trainer.tracker import SwanLabTracker, Tracker
+from ml_trainer.trainer import Trainer
 
 EXPERIMENT_NAME = "ScribeTokens0122"
+
+
+CONFIG = TrainerConfig(patience=PATIENCE)
 
 
 def load_train_state(model_id: ModelId) -> TrainState:
@@ -34,7 +40,7 @@ def load_train_state(model_id: ModelId) -> TrainState:
     scheduler = LambdaLR(optimiser, lr_lambda=lambda epoch: 1.0)
     train_state = TrainState(model, optimiser, scheduler)
 
-    latest_train_state = Checkpointer(model_id).load_latest_state(train_state)
+    latest_train_state = Checkpointer(model_id, CONFIG).load_latest_state(train_state)
     if latest_train_state is not None:
         print(f"Found latest checkpoint for {model_id}, resuming training")
         train_state = latest_train_state
@@ -61,6 +67,8 @@ def setup_tracker(model_id: ModelId) -> Tracker:
             "dropout": DROPOUT,
             "vocab_size": VOCAB_SIZE,
             "ffn_factor": FFN_FACTOR,
+            "grpo_num_samples": GRPO_NUM_SAMPLES,
+            "grpo_beta": GRPO_BETA,
         }
     )
     return tracker
@@ -69,7 +77,7 @@ def setup_tracker(model_id: ModelId) -> Tracker:
 def train_with_resume(model_id: ModelId) -> None:
     train_loader, val_loader, _ = create_dataloaders(model_id)
     train_state = load_train_state(model_id)
-    trainer = Trainer(model_id, setup_tracker(model_id), PATIENCE)
+    trainer = Trainer(model_id, setup_tracker(model_id), CONFIG)
     trainer.train(train_state, train_loader, val_loader, NUM_EPOCHS)
     distributed_context.barrier()  # sometimes training breaks without barrier I think?
 
@@ -85,10 +93,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from src.constants import CHECKPOINTS_DIR, TRACKERS_DIR
-    from src.utils.clear_folder import clear_folder
-    from src.utils.distributed_context import distributed_context
-    from src.utils.set_random_seed import set_random_seed
+    from constants import CHECKPOINTS_DIR, TRACKERS_DIR
+    from utils.clear_folder import clear_folder
+    from utils.distributed_context import distributed_context
+    from utils.set_random_seed import set_random_seed
 
     if distributed_context.is_master:
         clear_folder(CHECKPOINTS_DIR, confirm=True)

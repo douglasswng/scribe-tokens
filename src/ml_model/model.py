@@ -2,8 +2,8 @@ from torch import Tensor
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from ml_model.locals.local import LocalModel
+from ml_trainer.tracker import Tracker
 from schemas.batch import Batch
-from train.tracker import Tracker
 from utils.distributed_context import distributed_context
 
 

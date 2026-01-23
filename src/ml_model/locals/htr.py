@@ -2,9 +2,9 @@ import torch
 from torch import Tensor
 
 from dataloader.dataset import IdMapper
-from ml_model.locals.local import LocalModel
+from ml_model.locals.local import KVCaches, LocalModel
 from ml_model.modules.decoder import TransformerDecoder
-from ml_model.modules.embedder import CharEmbedder, Embedder
+from ml_model.modules.embedder import CharEmbedder, Embedder, VectorEmbedder
 from schemas.batch import Batch
 from schemas.instance import Instance
 
@@ -16,6 +16,9 @@ class HTRModel(LocalModel):
         self._char_embedder = CharEmbedder()
         self._decoder = decoder or TransformerDecoder()
 
+        if isinstance(self._repr_embedder, VectorEmbedder):
+            self._repr_embedder.strip_unembed()  # when using pretrained NTPModel
+
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
         input, target, mask = self._prepare_batch(
             batch=batch,
@@ -26,11 +29,26 @@ class HTRModel(LocalModel):
             target_target_attr="char_target",
         )
         logits = self._forward(input)
+        assert isinstance(logits, Tensor)
         return {"ce": self.ce_loss(logits, target, mask)}
 
-    def _forward(self, input: Tensor) -> Tensor:
-        output = self._decoder(input)
-        return self._char_embedder.unembed(output)
+    def _forward(
+        self,
+        input: Tensor,
+        start_pos: int = 0,
+        kv_caches: list[tuple[Tensor, Tensor]] | None = None,
+        use_cache: bool = False,
+    ) -> Tensor | tuple[Tensor, KVCaches]:
+        result = self._decoder(input, start_pos=start_pos, kv_caches=kv_caches, use_cache=use_cache)
+        if not use_cache:
+            assert isinstance(result, Tensor)
+            pred = self._char_embedder.unembed(result)
+            return pred
+        else:
+            assert isinstance(result, tuple)
+            output, new_kv_caches = result
+            pred = self._char_embedder.unembed(output)
+            return pred, new_kv_caches
 
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
@@ -55,30 +73,3 @@ class HTRModel(LocalModel):
             num_generations=1,
         )[0]
         return IdMapper.ids_to_str(char_ids.tolist())
-
-
-if __name__ == "__main__":
-    from dataloader.create import create_dataloaders
-    from ml_model.factory import create_embedder
-    from ml_model.id import ModelId, Task
-    from utils.distributed_context import distributed_context
-
-    for model_id in ModelId.create_task_model_ids(Task.HTR)[:]:
-        print(model_id)
-        train_loader, val_loader, test_loader = create_dataloaders(
-            model_id=model_id,
-            batch_size=1,
-            num_workers=0,
-            pin_memory=False,
-            persistent_workers=False,
-        )
-
-        repr_embedder = create_embedder(model_id.repr_id)
-        model = HTRModel(repr_embedder=repr_embedder).to(distributed_context.device)
-        for batch in train_loader:
-            model.train()
-            losses = model(batch)
-            print(losses)
-            model.eval()
-            model.monitor(batch)
-            break

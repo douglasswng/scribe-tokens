@@ -100,19 +100,3 @@ class TokeniserFactory:
         discrete_tokeniser = DiscreteFactory.create_discrete_tokeniser(id)
         trained_tokeniser = TrainedFactory.from_pretrained(id)
         return Tokeniser(preprocessor, discrete_tokeniser, trained_tokeniser)
-
-
-if __name__ == "__main__":
-    from schemas.parsed import Parsed
-
-    ink = Parsed.load_random().ink
-    ink.visualise()
-    print(f"DigitalInk length: {len(ink)}")
-
-    for id in TokeniserId.create_defaults():
-        tokeniser = TokeniserFactory.create(id)
-        tokens = tokeniser.tokenise(ink)
-        print(f"{id} length: {len(tokens)}")
-
-        ink = tokeniser.detokenise(tokens)
-        ink.visualise()

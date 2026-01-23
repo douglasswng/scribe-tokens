@@ -28,23 +28,41 @@ class Embedder(nn.Module, ABC):
 
 
 class VectorEmbedder(Embedder):
-    def __init__(self, input_dim: int):
+    def __init__(self, input_dim: int, with_unembed: bool = True):
         super().__init__()
         self._embedding = nn.Linear(input_dim, HIDDEN_DIM)
-
-        self._mixture_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES)
-        self._mean_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES * 2)
-        self._std_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES * 2)
-        self._rho_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES)
-        self._pen_state_proj = nn.Linear(HIDDEN_DIM, 3)
-
         self._dropout = nn.Dropout(DROPOUT)
+
+        # Only create unembed layers if needed (for HTG/NTP tasks)
+        if with_unembed:
+            self._mixture_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES)
+            self._mean_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES * 2)
+            self._std_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES * 2)
+            self._rho_proj = nn.Linear(HIDDEN_DIM, NUM_MIXTURES)
+            self._pen_state_proj = nn.Linear(HIDDEN_DIM, 3)
+        else:
+            self._mixture_proj = None
+            self._mean_proj = None
+            self._std_proj = None
+            self._rho_proj = None
+            self._pen_state_proj = None
 
     def embed(self, x: Tensor) -> Tensor:
         x = self._embedding(x)
         return self._dropout(x)
 
     def unembed(self, x: Tensor) -> MDNOutput:
+        if (
+            self._mixture_proj is None
+            or self._mean_proj is None
+            or self._std_proj is None
+            or self._rho_proj is None
+            or self._pen_state_proj is None
+        ):
+            raise RuntimeError(
+                "Unembed layers not initialized. Create VectorEmbedder with with_unembed=True."
+            )
+
         mixtures = self._mixture_proj(x)
         means = self._mean_proj(x)
         stds = self._std_proj(x)
@@ -57,6 +75,13 @@ class VectorEmbedder(Embedder):
         rhos = torch.tanh(rhos) * 0.99  # stability
 
         return mixtures, means, stds, rhos, pen_states
+
+    def strip_unembed(self) -> None:
+        self._mixture_proj = None
+        self._mean_proj = None
+        self._std_proj = None
+        self._rho_proj = None
+        self._pen_state_proj = None
 
 
 class TokenEmbedder(Embedder):
@@ -93,7 +118,6 @@ class CharEmbedder(Embedder):
         self._embedding = nn.Embedding(
             NUM_CHARS + 3, HIDDEN_DIM, padding_idx=0
         )  # +3 for pad, bos, eos
-        self._unembedding = nn.Linear(HIDDEN_DIM, NUM_CHARS + 3)
         self._dropout = nn.Dropout(DROPOUT)
 
     def embed(self, x: Tensor) -> Tensor:
@@ -101,5 +125,5 @@ class CharEmbedder(Embedder):
         return self._dropout(x)
 
     def unembed(self, x: Tensor) -> Tensor:
-        logits = self._unembedding(x)
+        logits = torch.matmul(x, self._embedding.weight.transpose(0, 1))  # parameter sharing
         return logits

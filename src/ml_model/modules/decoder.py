@@ -41,26 +41,25 @@ class TransformerDecoder(nn.Module):
         causal_mask = torch.triu(ones, diagonal=1).bool()
         return causal_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
 
-    # TODO: add kv cache
-    def forward(self, x: Tensor, start_pos: int = 0) -> Tensor:
-        # Create causal mask
-        seq_len = x.shape[1]
-        mask = self._create_causal_mask(seq_len, x.device)
+    def forward(
+        self,
+        x: Tensor,
+        start_pos: int = 0,
+        kv_caches: list[tuple[Tensor, Tensor]] | None = None,
+        use_cache: bool = False,
+    ) -> Tensor | tuple[Tensor, list[tuple[Tensor, Tensor]]]:
+        mask: Tensor | None = None
+        if kv_caches is None:
+            seq_len = x.shape[1]
+            mask = self._create_causal_mask(seq_len, x.device)
 
-        # Pass through decoder layers
-        for layer in self.layers:
-            x = layer(x, mask, start_pos)
+        new_caches: list[tuple[Tensor, Tensor]] = []
+        for i, layer in enumerate(self.layers):
+            current_cache = kv_caches[i] if kv_caches is not None and i < len(kv_caches) else None
+            x, layer_cache = layer(x, mask, start_pos, current_cache)
 
-        # Final layer norm
+            if use_cache:
+                new_caches.append(layer_cache)
+
         x = self.norm(x)
-        return x
-
-
-if __name__ == "__main__":
-    decoder = TransformerDecoder(
-        d_model=128, n_heads=4, n_layers=1, ffn_factor=8 / 3, dropout=0.1, max_seq_len=1024
-    )
-    x = torch.randn(2, 1024, 128)
-    x = decoder(x)
-    print(x.shape)
-    print(torch.any(torch.isnan(x)))
+        return (x, new_caches) if use_cache else x

@@ -24,22 +24,17 @@ class TransformerDecoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(
-        self, x: torch.Tensor, mask: torch.Tensor | None = None, start_pos: int = 0
-    ) -> torch.Tensor:
+        self,
+        x: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        start_pos: int = 0,
+        kv_cache: tuple[torch.Tensor, torch.Tensor] | None = None,
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         # Self-attention with residual connection and layer norm
-        attn_out = self.self_attn(self.norm1(x), mask, start_pos)
+        attn_out, new_kv_cache = self.self_attn(self.norm1(x), mask, start_pos, kv_cache)
         x = x + self.dropout(attn_out)
 
         # Feed-forward with residual connection and layer norm
         ff_out = self.feed_forward(self.norm2(x))
         x = x + self.dropout(ff_out)
-        return x
-
-
-if __name__ == "__main__":
-    batch_size, seq_len, num_heads, head_dim = 1, 1024, 16, 64
-    decoder_layer = TransformerDecoderLayer(head_dim, num_heads, head_dim * 4)
-    x = torch.randn(batch_size, seq_len, head_dim)
-    x = decoder_layer(x)
-    print(x.shape)
-    print(torch.any(torch.isnan(x)))
+        return x, new_kv_cache

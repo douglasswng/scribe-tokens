@@ -6,6 +6,7 @@
 __pycache__
 *.ipynb
 .env
+models/
 
 !/artifacts/results/
 !/artifacts/figures/

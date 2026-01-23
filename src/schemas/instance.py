@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from torch import Tensor
 
-from ink_repr.id import ReprId, TokeniserId
+from ink_repr.id import ReprId
 from schemas.parsed import Parsed
 
 
@@ -12,10 +12,6 @@ class Instance:
     repr_id: ReprId
     repr: Tensor
     char: Tensor
-
-    @property
-    def is_token(self) -> bool:
-        return isinstance(self.repr_id, TokeniserId)
 
     @property
     def repr_input(self) -> Tensor:

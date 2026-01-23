@@ -10,9 +10,9 @@ from ink_repr.id import ReprId, TokeniserId, VectorReprId
 class Task(StrEnum):
     HTR = "HTR"
     HTG = "HTG"
-    HTG_GRPO = "HTG_GRPO"
     NTP = "NTP"
     HTR_SFT = "HTR_SFT"
+    HTG_GRPO = "HTG_GRPO"
 
     @property
     def need_init_weights(self) -> bool:
@@ -76,8 +76,3 @@ class ModelId:
 
     def get_checkpoint_path(self, epoch: int) -> Path:
         return self.checkpoint_dir / f"checkpoint_{epoch}.pt"
-
-
-if __name__ == "__main__":
-    for model_id in ModelId.create_defaults():
-        print(model_id)

@@ -31,8 +31,12 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(
-        self, x: torch.Tensor, mask: torch.Tensor | None = None, start_pos: int = 0
-    ) -> torch.Tensor:
+        self,
+        x: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        start_pos: int = 0,
+        kv_cache: tuple[torch.Tensor, torch.Tensor] | None = None,
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         batch_size, seq_len, _ = x.shape
 
         # Linear projections
@@ -54,6 +58,16 @@ class MultiHeadAttention(nn.Module):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
+        # Handle KV cache
+        if kv_cache is not None:
+            k_cache, v_cache = kv_cache
+            # Concatenate with cached keys and values
+            k = torch.cat([k_cache, k], dim=2)
+            v = torch.cat([v_cache, v], dim=2)
+
+        # Store updated cache
+        new_kv_cache = (k, v)
+
         # Compute attention scores
         scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
 
@@ -72,11 +86,4 @@ class MultiHeadAttention(nn.Module):
         out = out.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)
         out = self.out_proj(out)
 
-        return out
-
-
-if __name__ == "__main__":
-    batch_size, seq_len, num_heads, head_dim = 1, 1024, 16, 64
-    mha = MultiHeadAttention(head_dim, num_heads)
-    x = torch.randn(batch_size, seq_len, head_dim)
-    print(mha(x).shape)
+        return out, new_kv_cache

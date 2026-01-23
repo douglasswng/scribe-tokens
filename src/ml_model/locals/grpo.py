@@ -1,3 +1,6 @@
+import copy
+from typing import Self
+
 import torch
 from torch import Tensor
 
@@ -23,8 +26,14 @@ class GRPOModel(LocalModel):
             param.requires_grad = False
         self.htr_model.eval()
 
-        # Store reference model state for KL penalty
-        self._ref_state = {k: v.clone() for k, v in self.htg_model.state_dict().items()}
+        # Create a separate Reference Model (Deep Copy)
+        # We assume htg_model can be deepcopied. If not, re-instantiate it using factory logic.
+        self.ref_model = copy.deepcopy(self.htg_model)
+
+        # Freeze Reference Model
+        for param in self.ref_model.parameters():
+            param.requires_grad = False
+        self.ref_model.eval()
 
     @torch.no_grad()
     def _generate_samples(self, instance: Instance, num_samples: int) -> list[tuple[Tensor, str]]:
@@ -66,51 +75,53 @@ class GRPOModel(LocalModel):
         Returns:
             Tensor: Sum of log probabilities over the sequence (scalar)
         """
-        # Temporarily swap to reference weights if needed
-        if use_ref_model:
-            current_state = self.htg_model.state_dict()
-            self.htg_model.load_state_dict(self._ref_state)
+        model = self.ref_model if use_ref_model else self.htg_model
 
-        # Embed context and target sequence
-        context_embed = self.htg_model._char_embedder.embed(instance.char).unsqueeze(0)
-        context_len = len(context_embed[0])
-        target_embed = self.htg_model._repr_embedder.embed(gen_sequence).unsqueeze(0)
+        # Use no_grad for frozen reference model to avoid building computation graph
+        ctx = torch.no_grad() if use_ref_model else torch.enable_grad()
 
-        # Concatenate and forward pass
-        input = torch.cat([context_embed, target_embed], dim=1)
-        pred = self.htg_model._forward(input)
+        with ctx:
+            # Embed context and target sequence
+            context_embed = model._char_embedder.embed(instance.char).unsqueeze(0)
+            context_len = len(context_embed[0])
+            target_embed = model._repr_embedder.embed(gen_sequence).unsqueeze(0)
 
-        # Compute log probability based on prediction type using LossMixin methods
-        seq_len = len(gen_sequence)
-        mask = torch.ones(1, seq_len - 1, dtype=torch.bool, device=gen_sequence.device)
+            # Concatenate and forward pass
+            input = torch.cat([context_embed, target_embed], dim=1)
+            pred = model._forward(input)
 
-        match pred:
-            case Tensor():
-                # Token-based: use ce_loss
-                logits = pred[:, context_len : context_len + seq_len - 1]
-                target_ids = gen_sequence[1:].unsqueeze(0)
-                ce = self.ce_loss(logits, target_ids, mask)
-                log_prob = -ce * (seq_len - 1)
-            case tuple():
-                # MDN-based: use nll_loss
-                mixtures, means, stds, rhos, pen_states = pred
-                mixtures_slice = mixtures[:, context_len : context_len + seq_len - 1]
-                means_slice = means[:, context_len : context_len + seq_len - 1]
-                stds_slice = stds[:, context_len : context_len + seq_len - 1]
-                rhos_slice = rhos[:, context_len : context_len + seq_len - 1]
-                pen_states_slice = pen_states[:, context_len : context_len + seq_len - 1]
-                target_vecs = gen_sequence[1:].unsqueeze(0)
-                pred_slice = (mixtures_slice, means_slice, stds_slice, rhos_slice, pen_states_slice)
-                nll = self.nll_loss(pred_slice, target_vecs, mask)
-                log_prob = -nll * (seq_len - 1)
-            case _:
-                raise ValueError(f"Unsupported prediction type: {type(pred)}")
+            # Compute log probability based on prediction type using LossMixin methods
+            seq_len = len(gen_sequence)
+            mask = torch.ones(1, seq_len - 1, dtype=torch.bool, device=gen_sequence.device)
 
-        # Restore current weights if we used reference model
-        if use_ref_model:
-            self.htg_model.load_state_dict(current_state)
+            match pred:
+                case Tensor():
+                    # Token-based: use ce_loss
+                    logits = pred[:, context_len : context_len + seq_len - 1]
+                    target_ids = gen_sequence[1:].unsqueeze(0)
+                    ce = self.ce_loss(logits, target_ids, mask)
+                    log_prob = -ce * (seq_len - 1)
+                case (mixtures, means, stds, rhos, pen_states):
+                    # MDN-based: use nll_loss
+                    mixtures_slice = mixtures[:, context_len : context_len + seq_len - 1]
+                    means_slice = means[:, context_len : context_len + seq_len - 1]
+                    stds_slice = stds[:, context_len : context_len + seq_len - 1]
+                    rhos_slice = rhos[:, context_len : context_len + seq_len - 1]
+                    pen_states_slice = pen_states[:, context_len : context_len + seq_len - 1]
+                    target_vecs = gen_sequence[1:].unsqueeze(0)
+                    pred_slice = (
+                        mixtures_slice,
+                        means_slice,
+                        stds_slice,
+                        rhos_slice,
+                        pen_states_slice,
+                    )
+                    nll = self.nll_loss(pred_slice, target_vecs, mask)
+                    log_prob = -nll * (seq_len - 1)
+                case _:
+                    raise ValueError(f"Unsupported prediction type: {type(pred)}")
 
-        return log_prob
+            return log_prob
 
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
         """
@@ -163,32 +174,30 @@ class GRPOModel(LocalModel):
     def monitor(self, batch: Batch) -> None:
         return self.htg_model.monitor(batch)
 
+    def train(self, mode: bool = True) -> Self:
+        """
+        Override train mode to ensure reference and reward models
+        remain in eval mode (frozen).
+        """
+        super().train(mode)
 
-if __name__ == "__main__":
-    from dataloader.create import create_dataloaders
-    from ml_model.factory import ModelFactory
-    from ml_model.id import ModelId, Task
-    from utils.distributed_context import distributed_context
+        # Explicitly force these back to eval mode
+        self.htr_model.eval()
+        self.ref_model.eval()
 
-    for model_id in ModelId.create_task_model_ids(Task.HTG_GRPO)[:]:
-        print(f"Testing GRPO model: {model_id}")
-        train_loader, val_loader, test_loader = create_dataloaders(
-            model_id=model_id,
-            batch_size=1,
-            num_workers=0,
-            pin_memory=False,
-            persistent_workers=False,
-        )
+        return self
 
-        model = ModelFactory.create(model_id).to(distributed_context.device)
-        print(f"Model has {float(model.num_params) / 1e6:.2f}M params")
+    def state_dict(self, *args, **kwargs):
+        """
+        Only save the trainable htg_model, not the frozen htr_model or ref_model.
+        - htr_model is always loaded from pretrained HTR_SFT in factory
+        - ref_model is always loaded from pretrained HTG in factory
+        """
+        return self.htg_model.state_dict(*args, **kwargs)
 
-        for batch in train_loader:
-            model.train()
-            print("Computing GRPO loss...")
-            losses = model(batch)
-            print(f"Losses: {losses}")
-            model.eval()
-            print("Monitoring...")
-            model.monitor(batch)
-            break
+    def load_state_dict(self, state_dict, strict=True, assign=False):
+        """
+        Load trained htg_model weights only.
+        ref_model and htr_model remain unchanged (pretrained from factory).
+        """
+        return self.htg_model.load_state_dict(state_dict, strict=strict, assign=assign)

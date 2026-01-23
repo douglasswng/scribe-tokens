@@ -16,8 +16,8 @@ def create_dataloader(
     batch_size: int,
     shuffle: bool,
     num_workers: int = 0,
-    pin_memory: bool = True,
-    persistent_workers: bool = True,
+    pin_memory: bool = False,
+    persistent_workers: bool = False,
 ) -> DataLoader:
     if distributed_context.is_distributed:
         sampler = DistributedSampler(
@@ -69,28 +69,3 @@ def create_dataloaders(
     val_dataloader = partial_create_dataloader(dataset=val_dataset, shuffle=False)
     test_dataloader = partial_create_dataloader(dataset=test_dataset, shuffle=False)
     return train_dataloader, val_dataloader, test_dataloader
-
-
-if __name__ == "__main__":
-    import time
-
-    num_workers_list = [0, 4, 16, 64, 256, 1024]
-    num_workers_list = [192]
-    for model_id in ModelId.create_defaults()[:]:
-        if distributed_context.is_master:
-            print(f"Model: {model_id}")
-        for num_workers in num_workers_list:
-            if distributed_context.is_master:
-                print(f"  num_workers = {num_workers}")
-            train_loader, val_loader, test_loader = create_dataloaders(
-                model_id, num_workers=num_workers
-            )
-
-            for epoch in range(2):
-                start = time.time()
-                for batch in train_loader:
-                    batch: Batch
-                    pass  # Simulate training step
-                elapsed = time.time() - start
-                if distributed_context.is_master:
-                    print(f"    Epoch = {epoch}, Time elapsed: {elapsed:.2f} seconds")

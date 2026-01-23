@@ -15,6 +15,10 @@ class SamplerMixin:
         Returns:
             [..., 1] sampled token indices
         """
+        # Mask out pad token (id 0) to ensure it's never picked during generation
+        logits = logits.clone()
+        logits[..., 0] = -float("inf")
+
         if temperature == 0.0:
             result = torch.argmax(logits, dim=-1, keepdim=True)
         else:

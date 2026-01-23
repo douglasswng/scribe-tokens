@@ -3,12 +3,12 @@ from typing import Iterable, Sized, Tuple
 
 import torch
 import torch.distributed as dist
-from model.id import ModelId
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 
+from ml_model.id import ModelId
 from schemas.batch import Batch
 from train.checkpointer import Checkpointer
 from train.early_stopper import EarlyStopper
@@ -148,8 +148,11 @@ def complete_epoch(
     return should_stop
 
 
-def initialise_training(train_state: TrainState, num_epochs: int) -> Tuple[TrainStats, tqdm]:
+def initialise_training(
+    train_state: TrainState, tracker: Tracker, num_epochs: int
+) -> Tuple[TrainStats, tqdm]:
     """Initialise training by creating stats tracker and progress bar."""
+    train_state.model.set_tracker(tracker)
     train_stats = TrainStats()
     epoch_pbar = create_progress_bar(range(train_state.epoch, num_epochs), "Epochs")
     return train_stats, epoch_pbar
@@ -232,7 +235,7 @@ class Trainer:
 
             for batch_idx, batch in enumerate(val_pbar):
                 if batch_idx == monitor_batch_idx:
-                    train_state.model.monitor(batch, self._tracker)
+                    train_state.model.monitor(batch)
 
                 process_validation_batch(train_state, train_stats, batch)
                 if distributed_context.is_master:

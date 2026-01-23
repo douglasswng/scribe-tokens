@@ -3,7 +3,8 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model.modules.rope import RoPEEmbedding
+
+from ml_model.modules.rope import RoPEEmbedding
 
 
 class MultiHeadAttention(nn.Module):

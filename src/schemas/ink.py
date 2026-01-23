@@ -1,9 +1,11 @@
+import io
 from typing import overload
 
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from PIL import Image
 from pydantic import BaseModel
 from scipy.signal import savgol_filter
 
@@ -145,10 +147,12 @@ class DigitalInk[T: (float, int)](BaseModel):
     def visualise(self, connect: bool = True, name: str | None = None) -> None:
         TMP_DIR.mkdir(parents=True, exist_ok=True)
 
-        fig, ax = self._create_plot(connect=connect)
+        fig = self._create_plot(connect=connect)[0]
 
         count = len(list(TMP_DIR.iterdir()))
         name = str(count) if name is None else f"{count}_{name}"
+        # Sanitize filename by replacing invalid characters
+        name = name.replace("/", "_")
         name = name[:100]
 
         pdf_path = TMP_DIR / f"{name}.pdf"
@@ -174,3 +178,14 @@ class DigitalInk[T: (float, int)](BaseModel):
                 ax.scatter(x, y, s=0.5, c="k")
 
         return fig, ax
+
+    def to_image(self) -> Image.Image:  # for logging
+        fig = self._create_plot()[0]
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", bbox_inches="tight", dpi=150)
+        buf.seek(0)
+        img = Image.open(buf)
+        plt.close(fig)
+
+        return img

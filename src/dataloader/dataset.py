@@ -1,14 +1,43 @@
 from functools import partial
 from pathlib import Path
 
-from model.id import ModelId
+import torch
 from torch.utils.data import Dataset
 
+from constants import CHARS, NUM_CHARS
 from dataloader.augmenter import Augmenter
 from dataloader.split import DataSplit
 from ink_repr.factory import ReprFactory
+from ml_model.id import ModelId
 from schemas.instance import Instance
 from schemas.parsed import Parsed
+from utils.distributed_context import distributed_context
+
+
+class IdMapper:
+    _CHAR_ID_MAP = {char: id for id, char in enumerate(CHARS, 1)}
+    _ID_CHAR_MAP = {v: k for k, v in _CHAR_ID_MAP.items()}
+
+    @classmethod
+    def chars_to_ids(cls, chars: list[str]) -> list[int]:
+        return [cls._CHAR_ID_MAP[char] for char in chars]
+
+    @classmethod
+    def ids_to_chars(cls, ids: list[int]) -> list[str]:
+        return [cls._ID_CHAR_MAP.get(id, "") for id in ids]  # empty string for bos and eos
+
+    @classmethod
+    def str_to_ids(cls, s: str) -> list[int]:
+        bos_id = NUM_CHARS + 1
+        eos_id = NUM_CHARS + 2
+
+        ids = cls.chars_to_ids(list(s))
+        ids = [bos_id] + ids + [eos_id]
+        return ids
+
+    @classmethod
+    def ids_to_str(cls, ids: list[int]) -> str:
+        return "".join(cls.ids_to_chars(ids))
 
 
 class ParsedDataset(Dataset):
@@ -33,8 +62,14 @@ class ParsedDataset(Dataset):
         if self._augment:
             parsed = Augmenter.augment(parsed)
 
+        device = distributed_context.device
         repr = ReprFactory.from_ink(parsed.ink, repr_id=self._model_id.repr_id)
-        return Instance(parsed=parsed, _repr_tensor=repr.to_tensor())
+        repr_tensor = repr.to_tensor().to(device)
+        char_tensor = torch.tensor(IdMapper.str_to_ids(parsed.text)).to(device)
+
+        return Instance(
+            parsed=parsed, repr_id=self._model_id.repr_id, repr=repr_tensor, char=char_tensor
+        )
 
     def __getitem__(self, idx: int) -> Instance:
         # Case 1: Augmentation is on. Never cache.

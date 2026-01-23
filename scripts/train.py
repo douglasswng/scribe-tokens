@@ -88,6 +88,7 @@ if __name__ == "__main__":
     from src.constants import CHECKPOINTS_DIR, TRACKERS_DIR
     from src.utils.clear_folder import clear_folder
     from src.utils.distributed_context import distributed_context
+    from src.utils.set_random_seed import set_random_seed
 
     if distributed_context.is_master:
         clear_folder(CHECKPOINTS_DIR, confirm=True)
@@ -95,4 +96,5 @@ if __name__ == "__main__":
         # clear_folder(MODELS_DIR, confirm=True)
 
     distributed_context.barrier()
+    set_random_seed(42)
     main()

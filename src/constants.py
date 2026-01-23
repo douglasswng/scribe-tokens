@@ -1,10 +1,14 @@
 from pathlib import Path
 from typing import Literal
 
+from utils.clear_folder import clear_folder
+
 # Paths
 BASE_DIR = Path(__file__).parent.parent
 
 TMP_DIR = BASE_DIR / "tmp"
+clear_folder(TMP_DIR, confirm=False)
+
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 DATA_DIR = BASE_DIR / "data"
 

@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model.modules.embedder import MDNOutput
 from torch import Tensor
+
+from ml_model.modules.embedder import MDNOutput
 
 
 class LossMixin:

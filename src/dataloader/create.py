@@ -1,12 +1,12 @@
 from functools import partial
 
-from model.id import ModelId
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from constants import BATCH_SIZE
 from dataloader.dataset import create_datasets
 from dataloader.split import create_datasplit
+from ml_model.id import ModelId
 from schemas.batch import Batch
 from utils.distributed_context import distributed_context
 

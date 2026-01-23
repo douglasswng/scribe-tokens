@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-from model.modules.ffn import FeedForward
-from model.modules.mha import MultiHeadAttention
+
+from ml_model.modules.ffn import FeedForward
+from ml_model.modules.mha import MultiHeadAttention
 
 
 class TransformerDecoderLayer(nn.Module):

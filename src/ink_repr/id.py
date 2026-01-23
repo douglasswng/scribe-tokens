@@ -20,23 +20,15 @@ class VectorReprId:
     def create_point5(cls) -> Self:
         return cls(VectorType.POINT5)
 
-    # @property
-    # def is_vector(self) -> bool:
-    #     return True
-
-    # @property
-    # def has_oov(self) -> bool:
-    #     return False
-
-    # @property
-    # def dim(self) -> int:
-    #     match self.type:
-    #         case VectorType.POINT3:
-    #             return 3
-    #         case VectorType.POINT5:
-    #             return 5
-    #         case _:
-    #             raise ValueError(f"Unknown vector repr type: {self.type}")
+    @property
+    def dim(self) -> int:
+        match self.type:
+            case VectorType.POINT3:
+                return 3
+            case VectorType.POINT5:
+                return 5
+            case _:
+                raise ValueError(f"Unknown vector repr type: {self.type}")
 
 
 ReprId = VectorReprId | TokeniserId

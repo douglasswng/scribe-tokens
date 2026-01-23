@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from model.modules.decoder_layer import TransformerDecoderLayer
 from torch import Tensor
 
 from constants import DROPOUT, FFN_FACTOR, HIDDEN_DIM, MAX_LEN, NUM_HEADS, NUM_LAYERS
+from ml_model.modules.decoder_layer import TransformerDecoderLayer
 
 
 class TransformerDecoder(nn.Module):
@@ -35,7 +35,7 @@ class TransformerDecoder(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def create_causal_mask(self, seq_len: int, device: torch.device) -> Tensor:
+    def _create_causal_mask(self, seq_len: int, device: torch.device) -> Tensor:
         """Create causal (lower triangular) mask"""
         ones = torch.ones(seq_len, seq_len, device=device)
         causal_mask = torch.triu(ones, diagonal=1).bool()
@@ -44,7 +44,7 @@ class TransformerDecoder(nn.Module):
     def forward(self, x: Tensor, start_pos: int = 0) -> Tensor:
         # Create causal mask
         seq_len = x.shape[1]
-        mask = self.create_causal_mask(seq_len, x.device)
+        mask = self._create_causal_mask(seq_len, x.device)
 
         # Pass through decoder layers
         for layer in self.layers:

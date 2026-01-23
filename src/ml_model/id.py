@@ -8,11 +8,19 @@ from ink_repr.id import ReprId, TokeniserId, VectorReprId
 
 
 class Task(StrEnum):
-    GENERATION = "generation"
-    GENERATION_GRPO = "generation_grpo"
-    RECOGNITION = "recognition"
-    PRETRAINING = "pretraining"
-    RECOGNITION_SFT = "recognition_sft"
+    HWR = "HWR"
+    HWG = "HWG"
+    HWG_GRPO = "HWG_GRPO"
+    NTP = "NTP"
+    HWR_SFT = "HWR_SFT"
+
+    @property
+    def need_init_weights(self) -> bool:
+        return self in {
+            Task.HWG,
+            Task.HWR,
+            Task.NTP,
+        }  # other tasks load from pretrained
 
 
 @dataclass(frozen=True)

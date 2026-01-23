@@ -66,3 +66,7 @@ SHEAR_FACTOR = 0.5  # shear factor between (-SHEAR_FACTOR, SHEAR_FACTOR)
 ROTATE_ANGLE = 5  # rotate angle (degrees) between (-ROTATE_ANGLE, ROTATE_ANGLE)
 JITTER_SIGMA = 5  # the std of gaussian noise added to the points
 AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, independently
+
+# GRPO hyperparameters
+GRPO_NUM_SAMPLES = 16  # number of samples to generate per instance for GRPO
+GRPO_BETA = 0.001  # KL penalty coefficient for GRPO

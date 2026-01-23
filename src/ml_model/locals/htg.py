@@ -10,7 +10,7 @@ from schemas.ink import DigitalInk
 from schemas.instance import Instance
 
 
-class HWGModel(LocalModel):
+class HTGModel(LocalModel):
     def __init__(self, repr_embedder: Embedder):
         super().__init__()
         self._repr_embedder = repr_embedder
@@ -44,7 +44,7 @@ class HWGModel(LocalModel):
         ink_pred = self.generate_ink(instance)
         self._track_ink(ink=ink_pred, task="HWG", caption=f"Text: {instance.parsed.text}")
 
-    @torch.inference_mode()
+    @torch.inference_mode()  # TODO: batch generation
     def generate_ink(self, instance: Instance, max_len: int = 50) -> DigitalInk:
         context = self._char_embedder.embed(instance.char)
         gen = self._generate_sequence(
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     from ml_model.id import ModelId, Task
     from utils.distributed_context import distributed_context
 
-    for model_id in ModelId.create_task_model_ids(Task.HWG)[::]:
+    for model_id in ModelId.create_task_model_ids(Task.HTG)[::]:
         print(model_id)
         train_loader, val_loader, test_loader = create_dataloaders(
             model_id=model_id,
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         )
 
         repr_embedder = create_embedder(model_id.repr_id)
-        model = HWGModel(repr_embedder=repr_embedder).to(distributed_context.device)
+        model = HTGModel(repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()
             losses = model(batch)

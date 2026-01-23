@@ -8,17 +8,17 @@ from ink_repr.id import ReprId, TokeniserId, VectorReprId
 
 
 class Task(StrEnum):
-    HWR = "HWR"
-    HWG = "HWG"
-    HWG_GRPO = "HWG_GRPO"
+    HTR = "HTR"
+    HTG = "HTG"
+    HTG_GRPO = "HTG_GRPO"
     NTP = "NTP"
-    HWR_SFT = "HWR_SFT"
+    HTR_SFT = "HTR_SFT"
 
     @property
     def need_init_weights(self) -> bool:
         return self in {
-            Task.HWG,
-            Task.HWR,
+            Task.HTG,
+            Task.HTR,
             Task.NTP,
         }  # other tasks load from pretrained
 

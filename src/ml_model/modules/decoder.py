@@ -41,6 +41,7 @@ class TransformerDecoder(nn.Module):
         causal_mask = torch.triu(ones, diagonal=1).bool()
         return causal_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
 
+    # TODO: add kv cache
     def forward(self, x: Tensor, start_pos: int = 0) -> Tensor:
         # Create causal mask
         seq_len = x.shape[1]

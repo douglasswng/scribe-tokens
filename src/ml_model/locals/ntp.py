@@ -15,14 +15,14 @@ class NTPModel(LocalModel):
 
     def __init__(self, repr_embedder: Embedder):
         super().__init__()
-        self._repr_embedder = repr_embedder
-        self._decoder = TransformerDecoder()
+        self.repr_embedder = repr_embedder
+        self.decoder = TransformerDecoder()
 
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
         input, target, mask = self._prepare_batch(
             batch=batch,
             context_embedder=None,
-            target_embedder=self._repr_embedder,
+            target_embedder=self.repr_embedder,
             context_attr=None,
             target_input_attr="repr_input",
             target_target_attr="repr_target",
@@ -37,8 +37,8 @@ class NTPModel(LocalModel):
             return {"nll": self.nll_loss(pred, target, mask)}
 
     def _forward(self, input: Tensor) -> Tensor | MDNOutput:
-        output = self._decoder(input)
-        return self._repr_embedder.unembed(output)
+        output = self.decoder(input)
+        return self.repr_embedder.unembed(output)
 
     def monitor(self, batch: Batch) -> None:
         instance = batch.get_random_instance()
@@ -49,7 +49,7 @@ class NTPModel(LocalModel):
     def generate_ink(self, instance: Instance, max_len: int = 50) -> DigitalInk:
         gen = self._generate_sequence(
             context=None,
-            output_embedder=self._repr_embedder,
+            output_embedder=self.repr_embedder,
             bos=instance.repr_bos,
             eos=instance.repr_eos,
             max_len=max_len,

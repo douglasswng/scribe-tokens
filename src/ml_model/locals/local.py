@@ -24,7 +24,6 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
     @abstractmethod
     def monitor(self, batch: Batch) -> None: ...
 
-    @abstractmethod
     def _forward(self, input: Tensor) -> Tensor | MDNOutput:
         """
         Forward pass through the model.
@@ -36,7 +35,7 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
             Either logits tensor [batch_size, seq_len, vocab_size] for token models,
             or MDNOutput tuple for vector models
         """
-        ...
+        raise NotImplementedError("Subclasses must implement this method")
 
     @property
     def local_model(self) -> Self:
@@ -45,7 +44,7 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
     @property
     def _device(self) -> torch.device:
         return next(self.parameters()).device
-    
+
     # must call model(batch) (internally model.__call__) to activate DDP hooks
     def forward(self, batch: Batch) -> dict[str, Tensor]:
         return self._losses(batch)
@@ -170,9 +169,6 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
         Returns:
             Generated sequence tensor
         """
-        if self.training:
-            raise ValueError("Generation is not supported in training mode")
-
         gen = bos.unsqueeze(0)  # [1, 5] (vector) or [1] (token)
         for _ in range(max_len):
             gen_embed = output_embedder.embed(gen).unsqueeze(0)

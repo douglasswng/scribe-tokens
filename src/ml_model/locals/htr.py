@@ -9,12 +9,12 @@ from schemas.batch import Batch
 from schemas.instance import Instance
 
 
-class HWRModel(LocalModel):
-    def __init__(self, repr_embedder: Embedder):
+class HTRModel(LocalModel):
+    def __init__(self, repr_embedder: Embedder, decoder: TransformerDecoder | None = None):
         super().__init__()
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
-        self._decoder = TransformerDecoder()
+        self._decoder = decoder or TransformerDecoder()
 
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
         input, target, mask = self._prepare_batch(
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     from ml_model.id import ModelId, Task
     from utils.distributed_context import distributed_context
 
-    for model_id in ModelId.create_task_model_ids(Task.HWR)[::-1]:
+    for model_id in ModelId.create_task_model_ids(Task.HTR)[:]:
         print(model_id)
         train_loader, val_loader, test_loader = create_dataloaders(
             model_id=model_id,
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         )
 
         repr_embedder = create_embedder(model_id.repr_id)
-        model = HWRModel(repr_embedder=repr_embedder).to(distributed_context.device)
+        model = HTRModel(repr_embedder=repr_embedder).to(distributed_context.device)
         for batch in train_loader:
             model.train()
             losses = model(batch)

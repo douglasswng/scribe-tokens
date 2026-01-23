@@ -7,6 +7,7 @@ from ml_model.id import ModelId, Task
 from ml_model.locals.hwg import HWGModel
 from ml_model.locals.hwr import HWRModel
 from ml_model.locals.local import LocalModel
+from ml_model.locals.ntp import NTPModel
 from ml_model.model import DDPModel, Model
 from ml_model.modules.embedder import Embedder, TokenEmbedder, VectorEmbedder
 from utils.distributed_context import distributed_context
@@ -32,6 +33,8 @@ class ModelFactory:
                 model = HWRModel(repr_embedder=embedder)
             case Task.HWG:
                 model = HWGModel(repr_embedder=embedder)
+            case Task.NTP:
+                model = NTPModel(repr_embedder=embedder)
             case _:
                 raise ValueError(f"Unsupported task: {model_id.task}")
         if model_id.task.need_init_weights:

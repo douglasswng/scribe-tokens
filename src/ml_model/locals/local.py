@@ -57,9 +57,9 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
     def _prepare_batch_tensors(
         self,
         batch: Batch,
-        context_embedder: Embedder,
+        context_embedder: Embedder | None,
         target_embedder: Embedder,
-        context_attr: str,
+        context_attr: str | None,
         target_input_attr: str,
         target_target_attr: str,
     ) -> tuple[Tensor, Tensor, Tensor]:
@@ -71,9 +71,11 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
 
         Args:
             batch: Batch of instances
-            context_embedder: Embedder for context part (e.g., char_embedder or repr_embedder)
+            context_embedder: Embedder for context part (e.g., char_embedder or repr_embedder).
+                If None, no context is used.
             target_embedder: Embedder for target part (e.g., repr_embedder or char_embedder)
-            context_attr: Attribute name for context (e.g., "char" or "repr")
+            context_attr: Attribute name for context (e.g., "char" or "repr").
+                If None, no context is used.
             target_input_attr: Attribute name for target input (e.g., "repr_input" or "char_input")
             target_target_attr: Attribute name for target targets
                 (e.g., "repr_target" or "char_target")
@@ -84,25 +86,42 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
         inputs, targets, masks = [], [], []
 
         for inst in batch.instances:
-            # Embed sequences
-            context = context_embedder.embed(getattr(inst, context_attr))
+            # Embed target sequences
             target_input = target_embedder.embed(getattr(inst, target_input_attr))
             target_target = getattr(inst, target_target_attr)
 
-            # Concatenate context + target for input
-            inputs.append(torch.cat([context, target_input], dim=0))
+            # Handle context if provided
+            if context_embedder is not None and context_attr is not None:
+                # Embed context
+                context = context_embedder.embed(getattr(inst, context_attr))
+                
+                # Concatenate context + target for input
+                inputs.append(torch.cat([context, target_input], dim=0))
 
-            # Create dummy target for context (1D for tokens, 2D for vectors)
-            if target_target.ndim == 1:
-                dummy = torch.zeros(context.shape[0], dtype=torch.long, device=self._device)
+                # Create dummy target for context (1D for tokens, 2D for vectors)
+                if target_target.ndim == 1:
+                    dummy = torch.zeros(
+                        context.shape[0], dtype=torch.long, device=self._device
+                    )
+                else:
+                    dummy = torch.zeros(
+                        context.shape[0], target_target.shape[-1], device=self._device
+                    )
+                targets.append(torch.cat([dummy, target_target], dim=0))
+
+                # Create mask (False for context, True for target)
+                context_mask = torch.zeros(
+                    context.shape[0], dtype=torch.bool, device=self._device
+                )
+                target_mask = torch.ones(
+                    target_input.shape[0], dtype=torch.bool, device=self._device
+                )
+                masks.append(torch.cat([context_mask, target_mask], dim=0))
             else:
-                dummy = torch.zeros(context.shape[0], target_target.shape[-1], device=self._device)
-            targets.append(torch.cat([dummy, target_target], dim=0))
-
-            # Create mask (False for context, True for target)
-            context_mask = torch.zeros(context.shape[0], dtype=torch.bool, device=self._device)
-            target_mask = torch.ones(target_input.shape[0], dtype=torch.bool, device=self._device)
-            masks.append(torch.cat([context_mask, target_mask], dim=0))
+                # No context, just use target
+                inputs.append(target_input)
+                targets.append(target_target)
+                masks.append(torch.ones(target_input.shape[0], dtype=torch.bool, device=self._device))
 
         # Pad sequences
         input = pad_sequence(inputs, batch_first=True, padding_value=0)

@@ -43,7 +43,7 @@ class HWRModel(LocalModel):
         )
 
     @torch.inference_mode()
-    def predict_text(self, instance: Instance, max_len: int = 100) -> str:
+    def predict_text(self, instance: Instance, max_len: int = 50) -> str:
         if self.training:
             raise ValueError("Prediction is not supported in training mode")
 

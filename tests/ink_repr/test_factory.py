@@ -25,16 +25,6 @@ def test_repr_factory():
         tensor2 = ReprFactory.from_ink(ink, repr_id).to_tensor()
         assert torch.equal(tensor1, tensor2)
 
-        # Test ink round-trip
-        ink1 = repr.to_ink()
-        ink2 = ReprFactory.from_tensor(tensor1, repr_id).to_ink()
-
-        print(ink1)
-        ink1.visualise()
-
-        # Only test first repr_id to avoid infinite loop from original code
-        break
-
 
 if __name__ == "__main__":
     test_repr_factory()

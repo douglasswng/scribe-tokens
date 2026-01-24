@@ -6,6 +6,7 @@ import torch
 from ml_model.id import ModelId
 from ml_trainer.config import TrainerConfig
 from ml_trainer.state import TrainState
+from utils.distributed_context import distributed_context
 
 
 class Checkpointer:
@@ -40,6 +41,9 @@ class Checkpointer:
 
     def _prune_checkpoints(self) -> None:
         """Remove old checkpoints beyond max_checkpoints limit."""
+        if distributed_context.is_worker:
+            return
+
         checkpoint_paths = self._model_id.list_checkpoint_paths()
         if len(checkpoint_paths) <= self._max_checkpoints:
             return
@@ -50,12 +54,18 @@ class Checkpointer:
 
     def save_model(self, train_state: TrainState) -> None:
         """Save just the model weights."""
+        if distributed_context.is_worker:
+            return
+
         model_path = self._model_id.model_path
         model_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(train_state.model.local_model.state_dict(), model_path)
 
     def save_state(self, train_state: TrainState) -> None:
         """Save full training state to checkpoint."""
+        if distributed_context.is_worker:
+            return
+
         checkpoint_path = self._model_id.get_checkpoint_path(train_state.epoch)
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self._get_state_dict(train_state), checkpoint_path)
@@ -63,6 +73,9 @@ class Checkpointer:
 
     def mark_as_best(self, epoch: int) -> None:
         """Create/update symlink pointing to the best checkpoint."""
+        if distributed_context.is_worker:
+            return
+
         checkpoint_path = self._model_id.get_checkpoint_path(epoch)
         if not checkpoint_path.exists():
             return

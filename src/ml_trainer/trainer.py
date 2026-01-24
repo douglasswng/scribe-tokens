@@ -9,8 +9,8 @@ from ml_trainer.early_stopper import EarlyStopper
 from ml_trainer.epoch_runner import EpochRunner
 from ml_trainer.gradient_handler import GradientHandler
 from ml_trainer.progress import ProgressFactory
-from ml_trainer.stats import TrainStats
 from ml_trainer.state import TrainState
+from ml_trainer.stats import TrainStats
 from ml_trainer.tracker import Tracker
 from utils.distributed_context import distributed_context
 
@@ -41,8 +41,12 @@ class Trainer:
 
         for _ in epoch_pbar:
             self._epoch_runner.prepare_epoch(train_state, train_stats, train_loader)
-            self._epoch_runner.run_training_epoch(train_state, train_stats, train_loader, num_epochs)
-            self._epoch_runner.run_validation_epoch(train_state, train_stats, val_loader, num_epochs)
+            self._epoch_runner.run_training_epoch(
+                train_state, train_stats, train_loader, num_epochs
+            )
+            self._epoch_runner.run_validation_epoch(
+                train_state, train_stats, val_loader, num_epochs
+            )
 
             should_stop = self._epoch_runner.complete_epoch(
                 train_state, train_stats, self._early_stopper, self._checkpointer

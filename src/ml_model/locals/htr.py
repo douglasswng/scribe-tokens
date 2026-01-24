@@ -4,7 +4,7 @@ from torch import Tensor
 from dataloader.dataset import IdMapper
 from ml_model.locals.local import KVCaches, LocalModel
 from ml_model.modules.decoder import TransformerDecoder
-from ml_model.modules.embedder import CharEmbedder, Embedder
+from ml_model.modules.embedder import CharEmbedder, Embedder, VectorEmbedder
 from schemas.batch import Batch
 from schemas.instance import Instance
 
@@ -15,6 +15,9 @@ class HTRModel(LocalModel):
         self._repr_embedder = repr_embedder
         self._char_embedder = CharEmbedder()
         self._decoder = decoder or TransformerDecoder()
+
+        if isinstance(self._repr_embedder, VectorEmbedder):
+            self._repr_embedder.strip_unembed()  # when using pretrained NTPModel
 
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
         input, target, mask = self._prepare_batch(

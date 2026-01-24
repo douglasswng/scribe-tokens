@@ -6,6 +6,8 @@ from constants import (
     DELTA,
     DROPOUT,
     FFN_FACTOR,
+    GRPO_BETA,
+    GRPO_NUM_SAMPLES,
     HIDDEN_DIM,
     LEARNING_RATE,
     NUM_EPOCHS,
@@ -21,9 +23,9 @@ from ml_model.factory import ModelFactory
 from ml_model.id import ModelId
 from ml_trainer.checkpointer import Checkpointer
 from ml_trainer.config import TrainerConfig
+from ml_trainer.state import TrainState
 from ml_trainer.tracker import SwanLabTracker, Tracker
 from ml_trainer.trainer import Trainer
-from ml_trainer.state import TrainState
 
 EXPERIMENT_NAME = "ScribeTokens0122"
 
@@ -65,6 +67,8 @@ def setup_tracker(model_id: ModelId) -> Tracker:
             "dropout": DROPOUT,
             "vocab_size": VOCAB_SIZE,
             "ffn_factor": FFN_FACTOR,
+            "grpo_num_samples": GRPO_NUM_SAMPLES,
+            "grpo_beta": GRPO_BETA,
         }
     )
     return tracker

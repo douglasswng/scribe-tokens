@@ -10,8 +10,8 @@ from ml_trainer.checkpointer import Checkpointer
 from ml_trainer.config import TrainerConfig
 from ml_trainer.early_stopper import EarlyStopper
 from ml_trainer.progress import ProgressFactory
-from ml_trainer.stats import TrainStats
 from ml_trainer.state import TrainState
+from ml_trainer.stats import TrainStats
 from ml_trainer.tracker import Tracker
 from utils.distributed_context import distributed_context
 
@@ -74,9 +74,7 @@ class EpochRunner:
     ) -> None:
         """Run one validation epoch."""
         train_state.model.eval()
-        pbar = ProgressFactory.create(
-            val_loader, f"Epoch {train_state.epoch}/{num_epochs} (Val)"
-        )
+        pbar = ProgressFactory.create(val_loader, f"Epoch {train_state.epoch}/{num_epochs} (Val)")
 
         with torch.no_grad():
             monitor_batch_idx = self._select_monitor_batch(pbar, train_state.epoch)

@@ -109,7 +109,13 @@ class GRPOModel(LocalModel):
                     rhos_slice = rhos[:, context_len : context_len + seq_len - 1]
                     pen_states_slice = pen_states[:, context_len : context_len + seq_len - 1]
                     target_vecs = gen_sequence[1:].unsqueeze(0)
-                    pred_slice = (mixtures_slice, means_slice, stds_slice, rhos_slice, pen_states_slice)
+                    pred_slice = (
+                        mixtures_slice,
+                        means_slice,
+                        stds_slice,
+                        rhos_slice,
+                        pen_states_slice,
+                    )
                     nll = self.nll_loss(pred_slice, target_vecs, mask)
                     log_prob = -nll * (seq_len - 1)
                 case _:

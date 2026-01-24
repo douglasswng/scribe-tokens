@@ -4,8 +4,8 @@ from torch import Tensor
 
 from ml_trainer.distributed_ops import DistributedOps
 from ml_trainer.gradient_handler import GradientHandler
-from ml_trainer.stats import BatchStats, TrainStats
 from ml_trainer.state import TrainState
+from ml_trainer.stats import BatchStats, TrainStats
 from ml_trainer.tracker import Tracker
 from schemas.batch import Batch
 from utils.distributed_context import distributed_context

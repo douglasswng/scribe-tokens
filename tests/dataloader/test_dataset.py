@@ -17,7 +17,7 @@ def test_dataset_loading():
             # Test loading speed (should be faster on second access due to caching)
             for _ in range(5):
                 start = time()
-                instance = train_dataset[0]
+                train_dataset[0]
                 end = time()
                 print(f"Time taken: {end - start} seconds")
             print()

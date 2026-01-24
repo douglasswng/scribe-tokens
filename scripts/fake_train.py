@@ -22,13 +22,15 @@ from ink_tokeniser.id import TokenType, TokeniserId
 from ml_model.factory import ModelFactory
 from ml_model.id import ModelId
 from ml_trainer.checkpointer import Checkpointer
-from ml_trainer.state import TrainState
+from ml_trainer.config import TrainerConfig
 from ml_trainer.tracker import SwanLabTracker, Tracker
 from ml_trainer.trainer import Trainer
+from ml_trainer.state import TrainState
 
 EXPERIMENT_NAME = "ScribeTokensFake"
 NUM_EPOCHS = 1
 BATCH_SIZE = 1
+CONFIG = TrainerConfig(patience=PATIENCE)
 
 
 def load_train_state(model_id: ModelId) -> TrainState:
@@ -38,7 +40,7 @@ def load_train_state(model_id: ModelId) -> TrainState:
     scheduler = LambdaLR(optimiser, lr_lambda=lambda epoch: 1.0)
     train_state = TrainState(model, optimiser, scheduler)
 
-    latest_train_state = Checkpointer(model_id).load_latest_state(train_state)
+    latest_train_state = Checkpointer(model_id, CONFIG).load_latest_state(train_state)
     if latest_train_state is not None:
         print(f"Found latest checkpoint for {model_id}, resuming training")
         train_state = latest_train_state
@@ -92,7 +94,7 @@ def train_with_resume(model_id: ModelId) -> None:
     val_loader = create_dataloader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     train_state = load_train_state(model_id)
-    trainer = Trainer(model_id, setup_tracker(model_id), PATIENCE)
+    trainer = Trainer(model_id, setup_tracker(model_id), CONFIG)
     trainer.train(train_state, train_loader, val_loader, NUM_EPOCHS)
     distributed_context.barrier()
 

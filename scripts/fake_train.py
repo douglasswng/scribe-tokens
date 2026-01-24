@@ -18,6 +18,7 @@ from constants import (
 from dataloader.create import create_dataloader
 from dataloader.dataset import create_datasets
 from dataloader.split import create_datasplit
+from ink_tokeniser.id import TokenType, TokeniserId
 from ml_model.factory import ModelFactory
 from ml_model.id import ModelId
 from ml_trainer.checkpointer import Checkpointer
@@ -26,7 +27,7 @@ from ml_trainer.tracker import SwanLabTracker, Tracker
 from ml_trainer.trainer import Trainer
 
 EXPERIMENT_NAME = "ScribeTokensFake"
-NUM_EPOCHS = 2
+NUM_EPOCHS = 1
 BATCH_SIZE = 1
 
 
@@ -99,6 +100,9 @@ def train_with_resume(model_id: ModelId) -> None:
 def main() -> None:
     model_ids = ModelId.create_defaults()
     for model_id in model_ids:
+        if isinstance(tokeniser_id := model_id.repr_id, TokeniserId) and tokeniser_id.type != TokenType.REL:
+            print(f"Using RelTokens for tokeniser testing, skipping {model_id}")
+            continue
         if model_id.model_path.exists():
             print(f"Model {model_id} already trained")
             continue

@@ -77,41 +77,45 @@ class GRPOModel(LocalModel):
         """
         model = self.ref_model if use_ref_model else self.htg_model
 
-        # Embed context and target sequence
-        context_embed = model._char_embedder.embed(instance.char).unsqueeze(0)
-        context_len = len(context_embed[0])
-        target_embed = model._repr_embedder.embed(gen_sequence).unsqueeze(0)
+        # Use no_grad for frozen reference model to avoid building computation graph
+        ctx = torch.no_grad() if use_ref_model else torch.enable_grad()
 
-        # Concatenate and forward pass
-        input = torch.cat([context_embed, target_embed], dim=1)
-        pred = model._forward(input)
+        with ctx:
+            # Embed context and target sequence
+            context_embed = model._char_embedder.embed(instance.char).unsqueeze(0)
+            context_len = len(context_embed[0])
+            target_embed = model._repr_embedder.embed(gen_sequence).unsqueeze(0)
 
-        # Compute log probability based on prediction type using LossMixin methods
-        seq_len = len(gen_sequence)
-        mask = torch.ones(1, seq_len - 1, dtype=torch.bool, device=gen_sequence.device)
+            # Concatenate and forward pass
+            input = torch.cat([context_embed, target_embed], dim=1)
+            pred = model._forward(input)
 
-        match pred:
-            case Tensor():
-                # Token-based: use ce_loss
-                logits = pred[:, context_len : context_len + seq_len - 1]
-                target_ids = gen_sequence[1:].unsqueeze(0)
-                ce = self.ce_loss(logits, target_ids, mask)
-                log_prob = -ce * (seq_len - 1)
-            case (mixtures, means, stds, rhos, pen_states):
-                # MDN-based: use nll_loss
-                mixtures_slice = mixtures[:, context_len : context_len + seq_len - 1]
-                means_slice = means[:, context_len : context_len + seq_len - 1]
-                stds_slice = stds[:, context_len : context_len + seq_len - 1]
-                rhos_slice = rhos[:, context_len : context_len + seq_len - 1]
-                pen_states_slice = pen_states[:, context_len : context_len + seq_len - 1]
-                target_vecs = gen_sequence[1:].unsqueeze(0)
-                pred_slice = (mixtures_slice, means_slice, stds_slice, rhos_slice, pen_states_slice)
-                nll = self.nll_loss(pred_slice, target_vecs, mask)
-                log_prob = -nll * (seq_len - 1)
-            case _:
-                raise ValueError(f"Unsupported prediction type: {type(pred)}")
+            # Compute log probability based on prediction type using LossMixin methods
+            seq_len = len(gen_sequence)
+            mask = torch.ones(1, seq_len - 1, dtype=torch.bool, device=gen_sequence.device)
 
-        return log_prob
+            match pred:
+                case Tensor():
+                    # Token-based: use ce_loss
+                    logits = pred[:, context_len : context_len + seq_len - 1]
+                    target_ids = gen_sequence[1:].unsqueeze(0)
+                    ce = self.ce_loss(logits, target_ids, mask)
+                    log_prob = -ce * (seq_len - 1)
+                case (mixtures, means, stds, rhos, pen_states):
+                    # MDN-based: use nll_loss
+                    mixtures_slice = mixtures[:, context_len : context_len + seq_len - 1]
+                    means_slice = means[:, context_len : context_len + seq_len - 1]
+                    stds_slice = stds[:, context_len : context_len + seq_len - 1]
+                    rhos_slice = rhos[:, context_len : context_len + seq_len - 1]
+                    pen_states_slice = pen_states[:, context_len : context_len + seq_len - 1]
+                    target_vecs = gen_sequence[1:].unsqueeze(0)
+                    pred_slice = (mixtures_slice, means_slice, stds_slice, rhos_slice, pen_states_slice)
+                    nll = self.nll_loss(pred_slice, target_vecs, mask)
+                    log_prob = -nll * (seq_len - 1)
+                case _:
+                    raise ValueError(f"Unsupported prediction type: {type(pred)}")
+
+            return log_prob
 
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
         """
@@ -176,3 +180,18 @@ class GRPOModel(LocalModel):
         self.ref_model.eval()
 
         return self
+
+    def state_dict(self, *args, **kwargs):
+        """
+        Only save the trainable htg_model, not the frozen htr_model or ref_model.
+        - htr_model is always loaded from pretrained HTR_SFT in factory
+        - ref_model is always loaded from pretrained HTG in factory
+        """
+        return self.htg_model.state_dict(*args, **kwargs)
+
+    def load_state_dict(self, state_dict, strict=True, assign=False):
+        """
+        Load trained htg_model weights only.
+        ref_model and htr_model remain unchanged (pretrained from factory).
+        """
+        return self.htg_model.load_state_dict(state_dict, strict=strict, assign=assign)

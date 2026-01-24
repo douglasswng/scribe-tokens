@@ -50,10 +50,3 @@ class RoPEEmbedding(nn.Module):
         x_out = torch.view_as_real(x_rotated).flatten(-2)
 
         return x_out.type_as(x)
-
-
-if __name__ == "__main__":
-    batch_size, seq_len, num_heads, head_dim = 1, 1024, 16, 64
-    rope = RoPEEmbedding(head_dim, max_seq_len=seq_len)
-    x = torch.randn(batch_size, seq_len, num_heads, head_dim)
-    print(rope.apply_rotary_emb(x).shape)

@@ -1,7 +1,7 @@
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 
-from src.constants import (
+from constants import (
     BATCH_SIZE,
     DELTA,
     DROPOUT,
@@ -16,13 +16,13 @@ from src.constants import (
     VOCAB_SIZE,
     WEIGHT_DECAY,
 )
-from src.dataloader.create import create_dataloaders
-from src.ml_model.factory import ModelFactory
-from src.ml_model.id import ModelId
-from src.train.checkpointer import Checkpointer
-from src.train.state import TrainState
-from src.train.tracker import SwanLabTracker, Tracker
-from src.train.trainer import Trainer
+from dataloader.create import create_dataloaders
+from ml_model.factory import ModelFactory
+from ml_model.id import ModelId
+from ml_trainer.checkpointer import Checkpointer
+from ml_trainer.state import TrainState
+from ml_trainer.tracker import SwanLabTracker, Tracker
+from ml_trainer.trainer import Trainer
 
 EXPERIMENT_NAME = "ScribeTokens0122"
 
@@ -85,10 +85,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from src.constants import CHECKPOINTS_DIR, TRACKERS_DIR
-    from src.utils.clear_folder import clear_folder
-    from src.utils.distributed_context import distributed_context
-    from src.utils.set_random_seed import set_random_seed
+    from constants import CHECKPOINTS_DIR, TRACKERS_DIR
+    from utils.clear_folder import clear_folder
+    from utils.distributed_context import distributed_context
+    from utils.set_random_seed import set_random_seed
 
     if distributed_context.is_master:
         clear_folder(CHECKPOINTS_DIR, confirm=True)

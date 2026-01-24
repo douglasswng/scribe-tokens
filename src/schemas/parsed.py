@@ -33,9 +33,3 @@ class Parsed(BaseModel):
 
     def visualise(self) -> None:
         self.ink.visualise(name=self.text)
-
-
-if __name__ == "__main__":
-    parsed = Parsed.load_random()
-    print(parsed)
-    parsed.visualise()

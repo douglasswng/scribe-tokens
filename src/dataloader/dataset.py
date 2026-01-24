@@ -96,20 +96,3 @@ def create_datasets(
     val_dataset = partial_parsed_dataset(parsed_paths=val_paths, augment=False)
     test_dataset = partial_parsed_dataset(parsed_paths=test_paths, augment=False)
     return train_dataset, val_dataset, test_dataset
-
-
-if __name__ == "__main__":
-    from time import time
-
-    from dataloader.split import create_datasplit
-
-    for _ in range(2):
-        for model_id in ModelId.create_defaults():
-            print(model_id)
-            train_dataset, val_dataset, test_dataset = create_datasets(model_id, create_datasplit())
-            for _ in range(5):
-                start = time()
-                instance = train_dataset[0]
-                end = time()
-                print(f"Time taken: {end - start} seconds")
-            print()

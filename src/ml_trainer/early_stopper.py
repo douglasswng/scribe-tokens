@@ -1,4 +1,4 @@
-from train.stats import EpochStats
+from ml_trainer.stats import EpochStats
 
 
 class EarlyStopper:

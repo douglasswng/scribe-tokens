@@ -8,9 +8,9 @@ from torch.nn.utils.rnn import pad_sequence
 from ml_model.losses import LossMixin
 from ml_model.modules.embedder import Embedder, MDNOutput, VectorEmbedder
 from ml_model.sampler import SamplerMixin
+from ml_trainer.tracker import Tracker
 from schemas.batch import Batch
 from schemas.ink import DigitalInk
-from train.tracker import Tracker
 
 type ForwardOutput = Tensor | MDNOutput
 type KVCaches = list[tuple[Tensor, Tensor]]

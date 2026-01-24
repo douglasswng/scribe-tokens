@@ -12,9 +12,9 @@ class TextTokeniser(DiscreteTokeniser):
     def _create_text_token(self, char: str) -> RegularToken:
         return RegularToken(type=RegularTokenType.TEXT, values=char)
 
-    def tokenise(self, digital_ink: DigitalInk[int]) -> list[Token]:
+    def tokenise(self, ink: DigitalInk[int]) -> list[Token]:
         tokens: list[Token] = [self.start_token]
-        for point in get_stroke_point_iterator(digital_ink).rel_points:
+        for point in get_stroke_point_iterator(ink).rel_points:
             text = f"{point.point.x}{SEP}{point.point.y}"
             if not point.is_stroke_end:
                 text += SEP
@@ -79,18 +79,3 @@ class TextTokeniser(DiscreteTokeniser):
                 case _:
                     raise ValueError(f"Unknown token: {obj}")
         return DigitalInk(strokes=strokes)
-
-
-if __name__ == "__main__":
-    from schemas.parsed import Parsed
-
-    parsed = Parsed.load_random()
-    digital_ink = parsed.ink
-    digital_ink.visualise()
-
-    tokeniser = TextTokeniser()
-    tokens = tokeniser.tokenise(digital_ink)
-    print("\n".join([str(token) for token in tokens]))
-
-    detokenised = tokeniser.detokenise(tokens)
-    detokenised.visualise()

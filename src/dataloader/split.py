@@ -49,11 +49,3 @@ class DataSplit:
 
 def create_datasplit() -> DataSplit:
     return DataSplit(*split_parsed_paths())
-
-
-if __name__ == "__main__":
-    split = create_datasplit()
-    print(len(split.train_paths))
-    print(len(split.val_paths))
-    print(len(split.test_paths))
-    print()

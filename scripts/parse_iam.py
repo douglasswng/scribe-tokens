@@ -5,7 +5,7 @@ from pathlib import Path
 
 import ujson as json
 
-from src.constants import (
+from constants import (
     DATASET,
     PARSED_DIR,
     RAW_DIR,
@@ -13,9 +13,9 @@ from src.constants import (
     TRAIN_SPLIT_PATH,
     VAL_SPLIT_PATH,
 )
-from src.schemas.ink import DigitalInk
-from src.schemas.parsed import Parsed
-from src.utils.clear_folder import clear_folder
+from schemas.ink import DigitalInk
+from schemas.parsed import Parsed
+from utils.clear_folder import clear_folder
 
 assert DATASET == "iam", "Dataset must be iam"
 

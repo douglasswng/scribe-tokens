@@ -9,12 +9,12 @@ from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 
 from ml_model.id import ModelId
+from ml_trainer.checkpointer import Checkpointer
+from ml_trainer.early_stopper import EarlyStopper
+from ml_trainer.state import TrainState
+from ml_trainer.stats import BatchStats, TrainStats
+from ml_trainer.tracker import Tracker
 from schemas.batch import Batch
-from train.checkpointer import Checkpointer
-from train.early_stopper import EarlyStopper
-from train.state import TrainState
-from train.stats import BatchStats, TrainStats
-from train.tracker import Tracker
 from utils.distributed_context import distributed_context
 
 
@@ -170,7 +170,10 @@ def finalise_training(
         return
 
     best_epoch = early_stopper.best_epoch
-    best_state = checkpointer.load_state(best_epoch, train_state)
+    try:
+        best_state = checkpointer.load_state(best_epoch, train_state)
+    except FileNotFoundError:  # TODO: clean this up
+        best_state = train_state
     checkpointer.save_model(best_state)
     tracker.end_run()
 
@@ -272,7 +275,7 @@ class Trainer:
         val_loader: DataLoader,
         num_epochs: int,
     ):
-        train_stats, epoch_pbar = initialise_training(train_state, num_epochs)
+        train_stats, epoch_pbar = initialise_training(train_state, self._tracker, num_epochs)
         self._execute_training_loop(
             train_state, train_stats, train_loader, val_loader, epoch_pbar, num_epochs
         )

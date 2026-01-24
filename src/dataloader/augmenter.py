@@ -93,27 +93,3 @@ class Augmenter:
     @classmethod
     def reset_config(cls):
         cls._config = AugmenterConfig()
-
-
-if __name__ == "__main__":
-    from ink_repr.factory import ReprFactory
-    from ink_repr.id import TokeniserId
-
-    parsed = Parsed.load_random()
-    parsed.visualise()
-    augmented_parsed = Augmenter.augment(parsed)
-    augmented_parsed.visualise()
-
-    repr_id = TokeniserId.create_defaults()[0]
-
-    original_tensor = ReprFactory.from_ink(parsed.ink, repr_id).to_tensor()
-    augmented_tensor = ReprFactory.from_ink(augmented_parsed.ink, repr_id).to_tensor()
-
-    original_ink = ReprFactory.from_tensor(original_tensor, repr_id).to_ink()
-    augmented_ink = ReprFactory.from_tensor(augmented_tensor, repr_id).to_ink()
-    original_ink.visualise()
-    augmented_ink.visualise()
-
-    print("Ink length:", len(parsed.ink))
-    print("Original token count:", original_tensor.size(0))
-    print("Augmented token count:", augmented_tensor.size(0))

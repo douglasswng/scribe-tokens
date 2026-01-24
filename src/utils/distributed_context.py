@@ -88,12 +88,3 @@ class DistributedContext:
 
 
 distributed_context = DistributedContext()
-
-
-if __name__ == "__main__":
-    print(distributed_context.is_master)
-    print(distributed_context.rank)
-    print(distributed_context.world_size)
-    print(distributed_context.local_rank)
-    print(distributed_context.device)
-    print(distributed_context.backend)

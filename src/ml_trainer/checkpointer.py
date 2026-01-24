@@ -1,5 +1,5 @@
 from ml_model.id import ModelId
-from train.state import TrainState
+from ml_trainer.state import TrainState
 
 
 class Checkpointer:

@@ -50,10 +50,3 @@ class StrokePointIterator[T: (float, int)](
 
 def get_stroke_point_iterator(digital_ink: DigitalInk[int]) -> StrokePointIterator[int]:
     return StrokePointIterator.from_digital_ink(digital_ink)
-
-
-if __name__ == "__main__":
-    digital_ink = DigitalInk.load_test()
-    stroke_point_iterator = StrokePointIterator.from_digital_ink(digital_ink)
-    print(stroke_point_iterator.abs_points)
-    print(stroke_point_iterator.rel_points)

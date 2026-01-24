@@ -63,13 +63,3 @@ class TransformerDecoder(nn.Module):
 
         x = self.norm(x)
         return (x, new_caches) if use_cache else x
-
-
-if __name__ == "__main__":
-    decoder = TransformerDecoder(
-        d_model=128, n_heads=4, n_layers=1, ffn_factor=8 / 3, dropout=0.1, max_seq_len=1024
-    )
-    x = torch.randn(2, 1024, 128)
-    output = decoder(x, use_cache=False)
-    print(output.shape)
-    print(torch.any(torch.isnan(output)))

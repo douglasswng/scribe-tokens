@@ -87,10 +87,3 @@ class MultiHeadAttention(nn.Module):
         out = self.out_proj(out)
 
         return out, new_kv_cache
-
-
-if __name__ == "__main__":
-    batch_size, seq_len, num_heads, head_dim = 1, 1024, 16, 64
-    mha = MultiHeadAttention(head_dim, num_heads)
-    x = torch.randn(batch_size, seq_len, head_dim)
-    print(mha(x).shape)

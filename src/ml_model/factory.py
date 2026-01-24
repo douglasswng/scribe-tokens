@@ -72,9 +72,3 @@ class ModelFactory:
         if distributed_context.is_distributed:
             model = DDPModel(model)
         return model
-
-
-if __name__ == "__main__":
-    for model_id in ModelId.create_defaults():
-        model = ModelFactory.create(model_id)
-        print(f"Model ({model_id}) has {float(model.num_params) / 1e6:.2f}M params")

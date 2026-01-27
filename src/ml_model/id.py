@@ -34,7 +34,8 @@ class ModelId:
     @classmethod
     def _get_repr_ids(cls) -> list[ReprId]:
         return [
-            VectorReprId.create_point5(),  # skip point-3 cannot be used for generation
+            # TODO: add back
+            # VectorReprId.create_point5(),  # skip point-3 cannot be used for generation
             TokeniserId.create_scribe(),  # skip absolute tokeniser since vocab size is too large
             # TokeniserId.create_rel(),
             # TokeniserId.create_text(),

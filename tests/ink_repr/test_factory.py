@@ -25,6 +25,9 @@ def test_repr_factory():
         tensor2 = ReprFactory.from_ink(ink, repr_id).to_tensor()
         assert torch.equal(tensor1, tensor2)
 
+        ink = repr.to_ink()
+        ink.visualise()
+
 
 if __name__ == "__main__":
     test_repr_factory()

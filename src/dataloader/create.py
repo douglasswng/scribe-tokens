@@ -42,7 +42,7 @@ def create_dataloader(
         pin_memory=pin_memory,
         drop_last=drop_last,
         persistent_workers=persistent_workers,
-        prefetch_factor=4,
+        prefetch_factor=4,  # TODO: check optimality
     )
 
 

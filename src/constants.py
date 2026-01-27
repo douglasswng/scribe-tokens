@@ -53,11 +53,11 @@ NUM_MIXTURES = 20
 
 # Training hyperparameters
 UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 WEIGHT_DECAY = 0.01
 NUM_EPOCHS = 300
 LEARNING_RATE = 1e-3
-PATIENCE_FACTOR = 0.1  # 10% of the epochs
+PATIENCE_FACTOR = 0.2  # 20% of the epochs
 PATIENCE = int(PATIENCE_FACTOR * NUM_EPOCHS)
 
 # Augmenter hyperparameters

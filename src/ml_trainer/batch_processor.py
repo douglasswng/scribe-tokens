@@ -8,6 +8,7 @@ from ml_trainer.state import TrainState
 from ml_trainer.stats import BatchStats, TrainStats
 from ml_trainer.tracker import Tracker
 from schemas.batch import Batch
+from schemas.instance import Instance
 from utils.distributed_context import distributed_context
 
 
@@ -17,6 +18,26 @@ class BatchProcessor:
     def __init__(self, gradient_handler: GradientHandler, tracker: Tracker):
         self._gradient_handler = gradient_handler
         self._tracker = tracker
+
+    def move_batch_to_device(self, batch: Batch) -> Batch:
+        """Move all tensors in the batch to the appropriate device.
+
+        This is done here (after batching) rather than in the Dataset for efficiency
+        and to support multi-worker DataLoaders.
+        """
+        device = distributed_context.device
+        moved_instances = []
+
+        for instance in batch.instances:
+            moved_instance = Instance(
+                parsed=instance.parsed,
+                repr_id=instance.repr_id,
+                repr=instance.repr.to(device, non_blocking=True),
+                char=instance.char.to(device, non_blocking=True),
+            )
+            moved_instances.append(moved_instance)
+
+        return Batch(instances=moved_instances)
 
     def process_train_batch(
         self,

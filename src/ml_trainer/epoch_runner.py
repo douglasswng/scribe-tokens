@@ -58,6 +58,7 @@ class EpochRunner:
         )
 
         for batch in pbar:
+            batch = self._batch_processor.move_batch_to_device(batch)
             self._batch_processor.process_train_batch(train_state, train_stats, batch)
             if distributed_context.is_master:
                 pbar.set_postfix(train_stats.curr_train_batch_stats.summary_dict)
@@ -80,6 +81,7 @@ class EpochRunner:
             monitor_batch_idx = self._select_monitor_batch(pbar, train_state.epoch)
 
             for batch_idx, batch in enumerate(pbar):
+                batch = self._batch_processor.move_batch_to_device(batch)
                 if batch_idx == monitor_batch_idx:
                     train_state.model.monitor(batch)
 

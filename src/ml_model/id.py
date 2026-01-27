@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Self
 
 from constants import CHECKPOINTS_DIR, MODELS_DIR
-from ink_repr.id import ReprId, TokeniserId, VectorReprId
+from ink_repr.id import ReprId, TokeniserId
 
 
 class Task(StrEnum):

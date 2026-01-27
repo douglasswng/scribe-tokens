@@ -69,7 +69,7 @@ class ModelFactory:
     @classmethod
     def load_pretrained(cls, model_id: ModelId) -> Model:
         model = cls._create_local(model_id)
-        state_dict = torch.load(model_id.model_path, weights_only=True, map_location="cpu")
+        state_dict = torch.load(model_id.model_path, weights_only=False, map_location="cpu")
         model.load_state_dict(state_dict)
         if distributed_context.is_distributed:
             model = DDPModel(model)

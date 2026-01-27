@@ -10,10 +10,8 @@ from constants import (
     GRPO_NUM_SAMPLES,
     HIDDEN_DIM,
     LEARNING_RATE,
-    NUM_EPOCHS,
     NUM_HEADS,
     NUM_LAYERS,
-    PATIENCE,
     TRACKERS_DIR,
     VOCAB_SIZE,
     WEIGHT_DECAY,
@@ -30,17 +28,14 @@ from ml_trainer.trainer import Trainer
 EXPERIMENT_NAME = "ScribeTokens0122"
 
 
-CONFIG = TrainerConfig(patience=PATIENCE)
-
-
-def load_train_state(model_id: ModelId) -> TrainState:
+def load_train_state(model_id: ModelId, config: TrainerConfig) -> TrainState:
     model = ModelFactory.create(model_id)
     print(f"Loaded model of size {float(model.num_params) / 1e6:.2f}M params")
     optimiser = AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = LambdaLR(optimiser, lr_lambda=lambda epoch: 1.0)
     train_state = TrainState(model, optimiser, scheduler)
 
-    latest_train_state = Checkpointer(model_id, CONFIG).load_latest_state(train_state)
+    latest_train_state = Checkpointer(model_id, config).load_latest_state(train_state)
     if latest_train_state is not None:
         print(f"Found latest checkpoint for {model_id}, resuming training")
         train_state = latest_train_state
@@ -58,8 +53,8 @@ def setup_tracker(model_id: ModelId) -> Tracker:
             "batch_size": BATCH_SIZE,
             "learning_rate": LEARNING_RATE,
             "weight_decay": WEIGHT_DECAY,
-            "num_epochs": NUM_EPOCHS,
-            "patience": PATIENCE,
+            "num_epochs": model_id.task.num_epochs,
+            "patience": model_id.task.patience,
             "delta": DELTA,
             "hidden_dim": HIDDEN_DIM,
             "num_layers": NUM_LAYERS,
@@ -76,9 +71,10 @@ def setup_tracker(model_id: ModelId) -> Tracker:
 
 def train_with_resume(model_id: ModelId) -> None:
     train_loader, val_loader, _ = create_dataloaders(model_id)
-    train_state = load_train_state(model_id)
-    trainer = Trainer(model_id, setup_tracker(model_id), CONFIG)
-    trainer.train(train_state, train_loader, val_loader, NUM_EPOCHS)
+    config = TrainerConfig(patience=model_id.task.patience)
+    train_state = load_train_state(model_id, config)
+    trainer = Trainer(model_id, setup_tracker(model_id), config)
+    trainer.train(train_state, train_loader, val_loader, model_id.task.num_epochs)
     distributed_context.barrier()  # sometimes training breaks without barrier I think?
 
 

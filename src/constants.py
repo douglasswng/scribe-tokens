@@ -41,24 +41,30 @@ NUM_CHARS = len(CHARS)  # 79
 VOCAB_SIZE = 32000
 DELTA = 8
 MAX_LEN = int(1e4)
-SCRIBE_DOWNSAMPLE_FACTOR = 16 / DELTA  # for scribe's post processor
+SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
 # Model hyperparameters
 HIDDEN_DIM = 384
 FFN_FACTOR = 8 / 3  # use swiglu ffn
 NUM_LAYERS = 12
 NUM_HEADS = 6
-DROPOUT = 0.1
+DROPOUT = 0.2
 NUM_MIXTURES = 20
 
 # Training hyperparameters
 UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
 BATCH_SIZE = 32
-WEIGHT_DECAY = 0.01
-NUM_EPOCHS = 300
-LEARNING_RATE = 1e-3
-PATIENCE_FACTOR = 0.2  # 20% of the epochs
-PATIENCE = int(PATIENCE_FACTOR * NUM_EPOCHS)
+WEIGHT_DECAY = 0.1
+# NUM_EPOCHS = 300
+LEARNING_RATE = 3e-4
+# PATIENCE = int(PATIENCE_FACTOR * NUM_EPOCHS)
+
+HTR_EPOCHS = 200
+HTG_EPOCHS = 100
+NTP_EPOCHS = 100
+HTR_SFT_EPOCHS = 50
+HTG_GRPO_EPOCHS = 0
+PATIENCE_FACTOR = 0.25
 
 # Augmenter hyperparameters
 SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)

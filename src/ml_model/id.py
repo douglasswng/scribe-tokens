@@ -3,7 +3,16 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
-from constants import CHECKPOINTS_DIR, MODELS_DIR
+from constants import (
+    CHECKPOINTS_DIR,
+    HTG_EPOCHS,
+    HTG_GRPO_EPOCHS,
+    HTR_EPOCHS,
+    HTR_SFT_EPOCHS,
+    MODELS_DIR,
+    NTP_EPOCHS,
+    PATIENCE_FACTOR,
+)
 from ink_repr.id import ReprId, TokeniserId, VectorReprId
 
 
@@ -22,6 +31,24 @@ class Task(StrEnum):
             Task.NTP,
         }  # other tasks load from pretrained
 
+    @property
+    def num_epochs(self) -> int:
+        match self:
+            case Task.HTR:
+                return HTR_EPOCHS
+            case Task.HTG:
+                return HTG_EPOCHS
+            case Task.NTP:
+                return NTP_EPOCHS
+            case Task.HTR_SFT:
+                return HTR_SFT_EPOCHS
+            case Task.HTG_GRPO:
+                return HTG_GRPO_EPOCHS
+
+    @property
+    def patience(self) -> int:
+        return int(self.num_epochs * PATIENCE_FACTOR)
+
 
 @dataclass(frozen=True)
 class ModelId:
@@ -34,11 +61,12 @@ class ModelId:
     @classmethod
     def _get_repr_ids(cls) -> list[ReprId]:
         return [
-            # TODO: add back
-            # VectorReprId.create_point5(),  # skip point-3 cannot be used for generation
-            TokeniserId.create_scribe(),  # skip absolute tokeniser since vocab size is too large
-            # TokeniserId.create_rel(),
-            # TokeniserId.create_text(),
+            # skip point-3 cannot be used for generation
+            # skip absolute tokeniser since vocab size is too large
+            TokeniserId.create_scribe(),
+            VectorReprId.create_point5(),
+            TokeniserId.create_rel(),
+            TokeniserId.create_text(),
         ]
 
     @classmethod
@@ -48,8 +76,11 @@ class ModelId:
     @classmethod
     def create_defaults(cls) -> list[Self]:
         model_ids = []
-        for task in Task:
-            model_ids.extend(cls.create_task_model_ids(task))
+        for repr_id in cls._get_repr_ids():
+            for task in Task:
+                if task == Task.HTG_GRPO:  # TODO: add this in, deal with OOM
+                    continue
+                model_ids.append(cls(task=task, repr_id=repr_id))
         return model_ids
 
     @property

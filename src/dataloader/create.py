@@ -42,13 +42,14 @@ def create_dataloader(
         pin_memory=pin_memory,
         drop_last=drop_last,
         persistent_workers=persistent_workers,
+        prefetch_factor=4,
     )
 
 
 def create_dataloaders(
     model_id: ModelId,
     batch_size: int = BATCH_SIZE,
-    num_workers: int = 192,  # seems decently optimal, same as number of cores
+    num_workers: int = 64,  # seems decently optimal, same as number of cores
     pin_memory: bool = True,
     persistent_workers: bool = True,  # seems to speed up
 ) -> tuple[DataLoader, DataLoader, DataLoader]:

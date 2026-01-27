@@ -13,9 +13,24 @@ from constants import TMP_DIR
 from utils.math_round import math_round
 
 
+def _reconstruct_point(x, y):
+    return Point(x=x, y=y)
+
+
+def _reconstruct_stroke(points):
+    return Stroke(points=points)
+
+
+def _reconstruct_digital_ink(strokes):
+    return DigitalInk(strokes=strokes)
+
+
 class Point[T: (float, int)](BaseModel):
     x: T
     y: T
+
+    def __reduce_ex__(self, protocol):  # for pickling
+        return (_reconstruct_point, (self.x, self.y))
 
     def __str__(self) -> str:
         return f"({self.x}, {self.y})"
@@ -38,6 +53,9 @@ class Point[T: (float, int)](BaseModel):
 
 class Stroke[T: (float, int)](BaseModel):
     points: list[Point[T]]
+
+    def __reduce_ex__(self, protocol):
+        return (_reconstruct_stroke, (self.points,))
 
     def __len__(self) -> int:
         return len(self.points)
@@ -86,6 +104,9 @@ class Stroke[T: (float, int)](BaseModel):
 
 class DigitalInk[T: (float, int)](BaseModel):
     strokes: list[Stroke[T]]
+
+    def __reduce_ex__(self, protocol):
+        return (_reconstruct_digital_ink, (self.strokes,))
 
     def __str__(self) -> str:
         line = "-" * 100

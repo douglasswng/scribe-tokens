@@ -11,7 +11,6 @@ from ink_repr.factory import ReprFactory
 from ml_model.id import ModelId
 from schemas.instance import Instance
 from schemas.parsed import Parsed
-from utils.distributed_context import distributed_context
 
 
 class IdMapper:
@@ -62,10 +61,9 @@ class ParsedDataset(Dataset):
         if self._augment:
             parsed = Augmenter.augment(parsed)
 
-        device = distributed_context.device
         repr = ReprFactory.from_ink(parsed.ink, repr_id=self._model_id.repr_id)
-        repr_tensor = repr.to_tensor().to(device)
-        char_tensor = torch.tensor(IdMapper.str_to_ids(parsed.text)).to(device)
+        repr_tensor = repr.to_tensor()
+        char_tensor = torch.tensor(IdMapper.str_to_ids(parsed.text))
 
         return Instance(
             parsed=parsed, repr_id=self._model_id.repr_id, repr=repr_tensor, char=char_tensor

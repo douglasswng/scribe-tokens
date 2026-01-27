@@ -47,13 +47,14 @@ SCRIBE_DOWNSAMPLE_FACTOR = 16 / DELTA  # for scribe's post processor
 HIDDEN_DIM = 384
 FFN_FACTOR = 8 / 3  # use swiglu ffn
 NUM_LAYERS = 12
+NUM_LAYERS = 6  # TODO: remove this line
 NUM_HEADS = 6
 DROPOUT = 0.1
 NUM_MIXTURES = 20
 
 # Training hyperparameters
 UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 WEIGHT_DECAY = 0.01
 NUM_EPOCHS = 300
 LEARNING_RATE = 1e-3

@@ -168,7 +168,8 @@ class GRPOModel(LocalModel):
 
         return {
             "grpo_loss": grpo_loss,
-            "avg_reward": avg_reward,
+            "avg_reward": avg_reward.detach(),
+            "early_stopper_rebalance": -grpo_loss.detach(),
         }
 
     def monitor(self, batch: Batch) -> None:

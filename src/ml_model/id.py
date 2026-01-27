@@ -36,8 +36,8 @@ class ModelId:
         return [
             VectorReprId.create_point5(),  # skip point-3 cannot be used for generation
             TokeniserId.create_scribe(),  # skip absolute tokeniser since vocab size is too large
-            TokeniserId.create_rel(),
-            TokeniserId.create_text(),
+            # TokeniserId.create_rel(),
+            # TokeniserId.create_text(),
         ]
 
     @classmethod

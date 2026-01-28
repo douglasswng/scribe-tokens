@@ -3,7 +3,16 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
-from constants import CHECKPOINTS_DIR, MODELS_DIR
+from constants import (
+    CHECKPOINTS_DIR,
+    HTG_EPOCHS,
+    HTG_GRPO_EPOCHS,
+    HTR_EPOCHS,
+    HTR_SFT_EPOCHS,
+    MODELS_DIR,
+    NTP_EPOCHS,
+    PATIENCE_FACTOR,
+)
 from ink_repr.id import ReprId, TokeniserId, VectorReprId
 
 
@@ -21,6 +30,24 @@ class Task(StrEnum):
             Task.HTR,
             Task.NTP,
         }  # other tasks load from pretrained
+
+    @property
+    def num_epochs(self) -> int:
+        match self:
+            case Task.HTR:
+                return HTR_EPOCHS
+            case Task.HTG:
+                return HTG_EPOCHS
+            case Task.NTP:
+                return NTP_EPOCHS
+            case Task.HTR_SFT:
+                return HTR_SFT_EPOCHS
+            case Task.HTG_GRPO:
+                return HTG_GRPO_EPOCHS
+
+    @property
+    def patience(self) -> int:
+        return int(self.num_epochs * PATIENCE_FACTOR)
 
 
 @dataclass(frozen=True)

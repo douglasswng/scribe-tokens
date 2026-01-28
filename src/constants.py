@@ -48,17 +48,23 @@ HIDDEN_DIM = 384
 FFN_FACTOR = 8 / 3  # use swiglu ffn
 NUM_LAYERS = 12
 NUM_HEADS = 6
-DROPOUT = 0.1
+DROPOUT = 0.2
 NUM_MIXTURES = 20
 
 # Training hyperparameters
 UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
 BATCH_SIZE = 32
-WEIGHT_DECAY = 0.01
-NUM_EPOCHS = 300
-LEARNING_RATE = 1e-3
-PATIENCE_FACTOR = 0.2  # 20% of the epochs
-PATIENCE = int(PATIENCE_FACTOR * NUM_EPOCHS)
+WEIGHT_DECAY = 0.1
+# NUM_EPOCHS = 300
+LEARNING_RATE = 3e-4
+# PATIENCE = int(PATIENCE_FACTOR * NUM_EPOCHS)
+
+HTR_EPOCHS = 200
+HTG_EPOCHS = 100
+NTP_EPOCHS = 100
+HTR_SFT_EPOCHS = 50
+HTG_GRPO_EPOCHS = 0
+PATIENCE_FACTOR = 0.25
 
 # Augmenter hyperparameters
 SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
@@ -70,11 +76,3 @@ AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, i
 # GRPO hyperparameters
 GRPO_NUM_SAMPLES = 16  # number of samples to generate per instance for GRPO
 GRPO_BETA = 0.001  # KL penalty coefficient for GRPO
-
-# ==== CANDIDATE HYPERPARAMETERS ====
-# Experiment hyperparameters
-WEIGHT_DECAY = 0.1
-LEARNING_RATE = 3e-4
-DROPOUT = 0.2
-NUM_EPOCHS = 200
-PATIENCE = 200

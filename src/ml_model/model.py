@@ -18,11 +18,11 @@ class DDPModel(DDP):
     def local_model(self) -> LocalModel:
         return self.module
 
-    def losses(self, batch: Batch) -> dict[str, Tensor]:
-        return self.local_model._losses(batch)
-
     def monitor(self, batch: Batch) -> None:
         return self.local_model.monitor(batch)
+
+    def validation_losses(self, batch: Batch) -> dict[str, Tensor]:
+        return self.local_model.validation_losses(batch)
 
     def set_tracker(self, tracker: Tracker) -> None:
         self.local_model.set_tracker(tracker)

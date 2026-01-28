@@ -4,6 +4,7 @@ import torch
 from pydantic import BaseModel, field_validator
 from torch import Tensor
 
+from constants import INK_SCALE
 from ink_repr.repr import InkRepr
 from schemas.ink import DigitalInk, Point, Stroke
 from utils.point_iterator import get_stroke_point_iterator
@@ -61,7 +62,12 @@ class Point5Repr(InkRepr):
 
     @classmethod
     def from_ink(cls, ink: DigitalInk) -> Self:
-        points: list[Point5] = [Point5.get_start()]
+        if len(ink) == 0:  # empty ink edge case
+            start = Point5.get_start()
+            end = start.model_copy(update={"pen_up": False, "pen_down": False, "end": True})
+            return cls([start, end])
+
+        points: list[Point5] = []
         for point in get_stroke_point_iterator(ink).rel_points:
             pen_up, pen_down = point.is_stroke_end, not point.is_stroke_end
             points.append(
@@ -70,12 +76,19 @@ class Point5Repr(InkRepr):
         if points:
             update = {"pen_up": False, "pen_down": False, "end": True}
             points[-1] = points[-1].model_copy(update=update)
+        points = [
+            Point5.get_start(),
+            *points,
+        ]
         return cls(points)
 
     @classmethod
     def from_tensor(cls, tensor: Tensor) -> Self:
+        # Only scale coordinates, not pen state flags
+        scaled_tensor = tensor.clone()
+        scaled_tensor[:, :2] = scaled_tensor[:, :2] / INK_SCALE
         points: list[Point5] = []
-        for point_tensor in tensor:
+        for point_tensor in scaled_tensor:
             points.append(Point5.from_tensor(point_tensor))
         return cls(points=points)
 
@@ -94,4 +107,7 @@ class Point5Repr(InkRepr):
         return DigitalInk(strokes=strokes)
 
     def to_tensor(self) -> Tensor:
-        return torch.stack([point.to_tensor() for point in self._points], dim=0)
+        tensor = torch.stack([point.to_tensor() for point in self._points], dim=0)
+        # Only scale coordinates, not pen state flags
+        tensor[:, :2] = tensor[:, :2] * INK_SCALE
+        return tensor

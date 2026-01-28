@@ -5,12 +5,10 @@ from typing import Self
 
 from constants import (
     CHECKPOINTS_DIR,
-    HTG_EPOCHS,
-    HTG_GRPO_EPOCHS,
-    HTR_EPOCHS,
-    HTR_SFT_EPOCHS,
+    GRPO_MONITOR_EVERY,
+    GRPO_STEPS,
     MODELS_DIR,
-    NTP_EPOCHS,
+    NUM_EPOCHS,
     PATIENCE_FACTOR,
 )
 from ink_repr.id import ReprId, TokeniserId, VectorReprId
@@ -21,6 +19,7 @@ class Task(StrEnum):
     HTG = "HTG"
     NTP = "NTP"
     HTR_SFT = "HTR_SFT"
+    HTG_SFT = "HTG_SFT"
     HTG_GRPO = "HTG_GRPO"
 
     @property
@@ -34,16 +33,10 @@ class Task(StrEnum):
     @property
     def num_epochs(self) -> int:
         match self:
-            case Task.HTR:
-                return HTR_EPOCHS
-            case Task.HTG:
-                return HTG_EPOCHS
-            case Task.NTP:
-                return NTP_EPOCHS
-            case Task.HTR_SFT:
-                return HTR_SFT_EPOCHS
             case Task.HTG_GRPO:
-                return HTG_GRPO_EPOCHS
+                return GRPO_STEPS // GRPO_MONITOR_EVERY
+            case _:
+                return NUM_EPOCHS
 
     @property
     def patience(self) -> int:
@@ -64,9 +57,9 @@ class ModelId:
             # skip point-3 cannot be used for generation
             # skip absolute tokeniser since vocab size is too large
             TokeniserId.create_scribe(),
-            VectorReprId.create_point5(),
             TokeniserId.create_rel(),
             TokeniserId.create_text(),
+            VectorReprId.create_point5(),
         ]
 
     @classmethod
@@ -78,8 +71,6 @@ class ModelId:
         model_ids = []
         for repr_id in cls._get_repr_ids():
             for task in Task:
-                if task == Task.HTG_GRPO:  # TODO: add this in, deal with OOM
-                    continue
                 model_ids.append(cls(task=task, repr_id=repr_id))
         return model_ids
 

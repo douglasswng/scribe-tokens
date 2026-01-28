@@ -10,10 +10,10 @@ from schemas.ink import DigitalInk
 
 
 class Parsed(BaseModel):
-    id: str
-    text: str
-    writer: str
-    ink: DigitalInk
+    id: str = "[NO ID]"
+    text: str = "[NO TEXT]"
+    writer: str = "[NO WRITER]"
+    ink: DigitalInk = DigitalInk(strokes=[])
 
     def __str__(self) -> str:
         return f"Id: {self.id}\nText: {self.text}\nWriter: {self.writer}\n{self.ink}"

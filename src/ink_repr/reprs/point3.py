@@ -4,6 +4,7 @@ import torch
 from pydantic import BaseModel
 from torch import Tensor
 
+from constants import INK_SCALE
 from ink_repr.repr import InkRepr
 from schemas.ink import DigitalInk, Point, Stroke
 from utils.point_iterator import get_stroke_point_iterator
@@ -44,8 +45,11 @@ class Point3Repr(InkRepr):
 
     @classmethod
     def from_tensor(cls, tensor: Tensor) -> Self:
+        # Only scale coordinates, not pen state flags
+        scaled_tensor = tensor.clone()
+        scaled_tensor[:, :2] = scaled_tensor[:, :2] / INK_SCALE
         points: list[Point3] = []
-        for point_tensor in tensor:
+        for point_tensor in scaled_tensor:
             points.append(Point3.from_tensor(point_tensor))
         return cls(points=points)
 
@@ -62,4 +66,7 @@ class Point3Repr(InkRepr):
         return DigitalInk(strokes=strokes)
 
     def to_tensor(self) -> Tensor:
-        return torch.stack([point.to_tensor() for point in self._points], dim=0)
+        tensor = torch.stack([point.to_tensor() for point in self._points], dim=0)
+        # Only scale coordinates, not pen state flags
+        tensor[:, :2] = tensor[:, :2] * INK_SCALE
+        return tensor

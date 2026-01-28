@@ -17,11 +17,19 @@ from utils.distributed_context import distributed_context
 class BatchProcessor:
     """Processes individual training and validation batches with mixed precision."""
 
-    def __init__(self, gradient_handler: GradientHandler, tracker: Tracker, use_amp: bool = True):
+    def __init__(
+        self,
+        gradient_handler: GradientHandler,
+        tracker: Tracker,
+        grad_accum_steps: int = 1,
+        use_amp: bool = True,
+    ):
         self._gradient_handler = gradient_handler
         self._tracker = tracker
+        self._grad_accum_steps = grad_accum_steps
         self._use_amp = use_amp and torch.cuda.is_available()
         self._scaler = GradScaler("cuda") if self._use_amp else None
+        self._accum_step = 0  # Track current accumulation step
 
     def move_batch_to_device(self, batch: Batch) -> Batch:
         """Move all tensors in the batch to the appropriate device."""
@@ -40,11 +48,22 @@ class BatchProcessor:
     def process_train_batch(
         self, train_state: TrainState, train_stats: TrainStats, batch: Batch
     ) -> None:
-        """Process a single training batch."""
-        losses = self._forward_pass(train_state.model, batch)
+        """Process a single training batch with gradient accumulation."""
+        # Forward pass with mixed precision
+        if self._use_amp:
+            with autocast("cuda", dtype=torch.bfloat16):
+                losses = train_state.model(batch)
+        else:
+            losses = train_state.model(batch)
+
         total_loss = sum(losses.values(), torch.tensor(0.0, device=distributed_context.device))
 
-        max_grad = self._backward_pass(train_state, total_loss)
+        # Update accumulation step and determine if we should step
+        self._accum_step = (self._accum_step + 1) % self._grad_accum_steps
+        is_step_batch = self._accum_step == 0
+
+        max_grad = self._backward_pass(train_state, total_loss, is_step_batch)
+
         self._sync_distributed(losses, max_grad)
         self._update_stats(train_stats, losses, max_grad, train_state)
 
@@ -52,34 +71,45 @@ class BatchProcessor:
         self, train_state: TrainState, train_stats: TrainStats, batch: Batch
     ) -> None:
         """Process a single validation batch."""
-        losses = self._forward_pass(train_state.model, batch)
+        if self._use_amp:
+            with autocast("cuda", dtype=torch.bfloat16):
+                losses = train_state.model.validation_losses(batch)
+        else:
+            losses = train_state.model.validation_losses(batch)
+
         self._sync_distributed(losses)
         train_stats.add_val_batch_stats(BatchStats(losses={k: v.item() for k, v in losses.items()}))
 
-    def _forward_pass(self, model: torch.nn.Module, batch: Batch) -> dict[str, Tensor]:
-        """Run forward pass with optional mixed precision."""
-        if self._use_amp:
-            with autocast("cuda", dtype=torch.bfloat16):
-                return model(batch)
-        return model(batch)
+    def _backward_pass(
+        self, train_state: TrainState, total_loss: Tensor, is_step_batch: bool
+    ) -> Tensor:
+        """Run backward pass with gradient accumulation."""
+        scaled_loss = total_loss / self._grad_accum_steps
 
-    def _backward_pass(self, train_state: TrainState, total_loss: Tensor) -> Tensor:
-        """Run backward pass with optional gradient scaling."""
-        train_state.optimiser.zero_grad()
-
-        if self._scaler is not None:
-            self._scaler.scale(total_loss).backward()
-            self._scaler.unscale_(train_state.optimiser)
+        if self._scaler:
+            self._scaler.scale(scaled_loss).backward()
         else:
-            total_loss.backward()
+            scaled_loss.backward()
+
+        if is_step_batch and self._scaler:
+            self._scaler.unscale_(train_state.optimiser)
 
         max_grad = self._gradient_handler.get_max_grad(train_state.model)
-        self._gradient_handler.clip(train_state)
-        train_state.optimiser.step()
-        train_state.scheduler.step()
 
-        if self._scaler is not None:
-            self._scaler.update()
+        if self._scaler and not is_step_batch:
+            max_grad = max_grad / self._scaler.get_scale()
+
+        if is_step_batch:
+            self._gradient_handler.clip(train_state)
+
+            if self._scaler:
+                self._scaler.step(train_state.optimiser)
+                self._scaler.update()
+            else:
+                train_state.optimiser.step()
+
+            train_state.scheduler.step()
+            train_state.optimiser.zero_grad()
 
         return max_grad
 

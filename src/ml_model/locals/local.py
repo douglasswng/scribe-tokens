@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Self
+from typing import Self, Sequence
 
 import torch
 from torch import Tensor, nn
@@ -27,15 +27,94 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
     @abstractmethod
     def monitor(self, batch: Batch) -> None: ...
 
+    def validation_losses(self, batch: Batch) -> dict[str, Tensor]:
+        """
+        Compute losses for validation. Override to customize validation behavior.
+
+        By default, uses the same losses as training. Models can override to:
+        - Return empty dict to skip validation metrics
+        - Return lightweight/approximate metrics
+        - Disable expensive operations (e.g., sampling, generation)
+        """
+        return self._losses(batch)
+
     def _forward(
         self,
         input: Tensor,
-        start_pos: int = 0,
+        start_pos: int | Tensor = 0,
         kv_caches: list[tuple[Tensor, Tensor]] | None = None,
+        attn_mask: Tensor | None = None,
         use_cache: bool = False,
     ) -> ForwardOutput | tuple[ForwardOutput, KVCaches]:
         """
-        Forward pass through the model with KV cache support.
+        Forward pass through the model with KV cache support for efficient generation.
+
+        This method supports both training (full sequence processing) and generation (incremental
+        decoding with KV caching) modes.
+
+        Args:
+            input: Embedded input tensor
+                Shape: (batch_size, seq_len, d_model)
+                - Training mode: seq_len is the full sequence length
+                - Generation mode with KV cache: seq_len=1 (only the newest token)
+
+            start_pos: Position information for Rotary Position Embedding (RoPE)
+                - int: Global start position. All sequences use consecutive positions
+                  [start_pos, start_pos + seq_len). Common during generation where it
+                  increments with each new token (0, 1, 2, ...).
+                - Tensor: Shape (batch_size, seq_len). Explicit position index for each
+                  element in the sequence. Used for non-consecutive position patterns.
+                Default: 0
+
+            kv_caches: Key-Value cache for efficient generation
+                - None: No caching (typical during training or first generation step)
+                - list[tuple[Tensor, Tensor]]: Cached keys and values from previous steps,
+                  one tuple (k_cache, v_cache) per transformer layer
+                  - k_cache shape: (batch_size, n_heads, cache_len, head_dim)
+                  - v_cache shape: (batch_size, n_heads, cache_len, head_dim)
+                  - cache_len: Number of previously processed tokens
+                Default: None
+
+            attn_mask: Attention mask to prevent attention to certain positions
+                Shape: (batch_size, 1, seq_len, seq_len) or (1, 1, seq_len, seq_len)
+                Convention: True/1 means "MASK IN" (position CAN be attended to)
+                Default: None (only causal masking is applied)
+
+            use_cache: Whether to return updated KV caches for the next generation step
+                - False: Return only the model output (typical during training)
+                - True: Return both output and updated KV caches (typical during generation)
+                Default: False
+
+        Returns:
+            When use_cache=False:
+                ForwardOutput: Model predictions
+                    - Tensor: Logits for token prediction, shape (batch_size, seq_len, vocab_size)
+                    - MDNOutput: Tuple of 5 tensors for mixture density network (vector prediction)
+
+            When use_cache=True:
+                tuple[ForwardOutput, KVCaches]: Model predictions and updated caches
+                    - ForwardOutput: Same as above
+                    - KVCaches: Updated key-value caches for all layers, same structure as
+                      input kv_caches but with cache_len increased by seq_len
+
+        Examples:
+            Training (full sequence):
+                >>> pred = model._forward(input)  # input: (32, 100, 512)
+                >>> # pred: (32, 100, vocab_size)
+
+            Generation (with KV cache):
+                >>> # First step (prefill context)
+                >>> output, caches = model._forward(context, use_cache=True)
+                >>> # context: (1, 50, 512), caches[0][0]: (1, 8, 50, 64)
+                >>>
+                >>> # Subsequent steps (incremental decoding)
+                >>> output, caches = model._forward(
+                ...     next_token_emb,  # (1, 1, 512)
+                ...     start_pos=50,
+                ...     kv_caches=caches,
+                ...     use_cache=True
+                ... )
+                >>> # caches[0][0] now: (1, 8, 51, 64)
         """
         raise NotImplementedError("Subclasses must implement this method for cached generation")
 
@@ -76,150 +155,201 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
     def _prepare_batch(
         self,
         batch: Batch,
-        context_embedder: Embedder | None,
-        target_embedder: Embedder,
-        context_attr: str | None,
-        target_input_attr: str,
-        target_target_attr: str,
+        prompt_embedder: Embedder | None,
+        completion_embedder: Embedder,
+        prompt_attr: str | None,
+        completion_input_attr: str,
+        completion_target_attr: str,
     ) -> tuple[Tensor, Tensor, Tensor]:
         """
-        Prepares batch tensors for training by concatenating context and target sequences.
+        Prepares batch tensors for training by concatenating prompt and completion sequences.
 
-        The context part comes first and has no loss computed (mask=False).
-        The target part comes second and has loss computed (mask=True).
+        The prompt part comes first and has no loss computed (loss_mask=False).
+        The completion part comes second and has loss computed (loss_mask=True).
 
         Args:
             batch: Batch of instances
-            context_embedder: Embedder for context part (e.g., char_embedder or repr_embedder).
-                If None, no context is used.
-            target_embedder: Embedder for target part (e.g., repr_embedder or char_embedder)
-            context_attr: Attribute name for context (e.g., "char" or "repr").
-                If None, no context is used.
-            target_input_attr: Attribute name for target input (e.g., "repr_input" or "char_input")
-            target_target_attr: Attribute name for target targets
-                (e.g., "repr_target" or "char_target")
+            prompt_embedder: Embedder for prompt part (e.g., char_embedder).
+                If None, no prompt is used.
+            completion_embedder: Embedder for completion part (e.g., repr_embedder)
+            prompt_attr: Attribute name for prompt (e.g., "char").
+                If None, no prompt is used.
+            completion_input_attr: Attribute name for completion input (e.g., "repr_input")
+            completion_target_attr: Attribute name for completion targets
+                (e.g., "repr_target")
 
         Returns:
-            Tuple of (padded_input, padded_target, padded_mask)
+            Tuple of (padded_input, padded_target, padded_loss_mask)
         """
-        inputs, targets, masks = [], [], []
+        inputs, targets, loss_masks = [], [], []
 
         for inst in batch.instances:
-            # Embed target sequences
-            target_input = target_embedder.embed(getattr(inst, target_input_attr))
-            target_target = getattr(inst, target_target_attr)
+            # Embed completion sequences
+            completion_input = completion_embedder.embed(getattr(inst, completion_input_attr))
+            completion_target = getattr(inst, completion_target_attr)
 
-            # Handle context if provided
-            if context_embedder is not None and context_attr is not None:
-                # Embed context
-                context = context_embedder.embed(getattr(inst, context_attr))
+            # Handle prompt if provided
+            if prompt_embedder is not None and prompt_attr is not None:
+                # Embed prompt
+                prompt = prompt_embedder.embed(getattr(inst, prompt_attr))
 
-                # Concatenate context + target for input
-                inputs.append(torch.cat([context, target_input], dim=0))
+                # Concatenate prompt + completion for input
+                inputs.append(torch.cat([prompt, completion_input], dim=0))
 
-                # Create dummy target for context (1D for tokens, 2D for vectors)
-                if target_target.ndim == 1:
-                    dummy = torch.zeros(context.shape[0], dtype=torch.long, device=self._device)
+                # Create dummy target for prompt (1D for tokens, 2D for vectors)
+                if completion_target.ndim == 1:
+                    dummy = torch.zeros(prompt.shape[0], dtype=torch.long, device=self._device)
                 else:
                     dummy = torch.zeros(
-                        context.shape[0], target_target.shape[-1], device=self._device
+                        prompt.shape[0], completion_target.shape[-1], device=self._device
                     )
-                targets.append(torch.cat([dummy, target_target], dim=0))
+                targets.append(torch.cat([dummy, completion_target], dim=0))
 
-                # Create mask (False for context, True for target)
-                context_mask = torch.zeros(context.shape[0], dtype=torch.bool, device=self._device)
-                target_mask = torch.ones(
-                    target_input.shape[0], dtype=torch.bool, device=self._device
+                # Create loss mask (False for prompt, True for completion)
+                prompt_mask = torch.zeros(prompt.shape[0], dtype=torch.bool, device=self._device)
+                completion_mask = torch.ones(
+                    completion_input.shape[0], dtype=torch.bool, device=self._device
                 )
-                masks.append(torch.cat([context_mask, target_mask], dim=0))
+                loss_masks.append(torch.cat([prompt_mask, completion_mask], dim=0))
             else:
-                # No context, just use target
-                inputs.append(target_input)
-                targets.append(target_target)
-                masks.append(
-                    torch.ones(target_input.shape[0], dtype=torch.bool, device=self._device)
+                # No prompt, just use completion
+                inputs.append(completion_input)
+                targets.append(completion_target)
+                loss_masks.append(
+                    torch.ones(completion_input.shape[0], dtype=torch.bool, device=self._device)
                 )
 
         # Pad sequences
         input = pad_sequence(inputs, batch_first=True, padding_value=0)
         target = pad_sequence(targets, batch_first=True, padding_value=0)
-        mask = pad_sequence(masks, batch_first=True, padding_value=0)
+        loss_mask = pad_sequence(loss_masks, batch_first=True, padding_value=0)
 
-        return input, target, mask
+        return input, target, loss_mask
 
     def _generate_sequences(
         self,
-        context: Tensor | None,
-        output_embedder: Embedder,
+        context: Sequence[Tensor | None],
         bos: Tensor,
         eos: Tensor,
+        output_embedder: Embedder,
         max_len: int,
         temperature: float,
         num_generations: int,
-    ) -> list[Tensor]:
+    ) -> list[list[Tensor]]:
         """
-        Vectorized sequence generation using KV cache for efficiency.
+        Batched sequence generation with left-padding for parallel processing.
 
         Args:
-            context: Optional context tensor [seq_len, hidden_dim] or None
-            output_embedder: Embedder for the output sequence
+            context: Sequence of context tensors (some may be None)
             bos: Beginning-of-sequence token/vector
             eos: End-of-sequence token/vector
+            output_embedder: Embedder for the output sequence
             max_len: Maximum generation length
             temperature: Sampling temperature
-            num_generations: Number of sequences to generate in parallel
+            num_generations: Number of sequences to generate per context
 
         Returns:
-            List of generated sequence tensors
+            List of lists - outer list per context, inner list per generation
         """
-        # Initialize: [batch_size, 1, ...] where ... is () for tokens or (5,) for vectors
-        if bos.ndim == 0:  # Token case
-            gen = bos.unsqueeze(0).expand(num_generations, 1)  # [batch, 1]
-        else:  # Vector case
-            gen = bos.unsqueeze(0).expand(num_generations, -1).unsqueeze(1)  # [batch, 1, 5]
+        num_contexts = len(context)
+        batch_size = num_contexts * num_generations
 
-        # Track which sequences have finished
-        finished = torch.zeros(num_generations, dtype=torch.bool, device=self._device)
+        # Determine context lengths (0 for None contexts)
+        context_lens = torch.tensor(
+            [c.shape[0] if c is not None else 0 for c in context], device=self._device
+        )
+        max_context_len = int(context_lens.max().item())
 
-        # Initialize KV cache and position tracking
+        # Get hidden dimension and dtype from first non-None context or embedder
+        first_context = next((c for c in context if c is not None), None)
+        if first_context is not None:
+            hidden_dim = first_context.shape[-1]
+            dtype = first_context.dtype
+        else:
+            dummy = output_embedder.embed(bos.unsqueeze(0).unsqueeze(0))
+            hidden_dim = dummy.shape[-1]
+            dtype = dummy.dtype
+
+        # Initialize KV cache and masks
         kv_caches: list[tuple[Tensor, Tensor]] | None = None
-        start_pos = 0
+        attention_mask: Tensor | None = None
 
-        # Process context once if it exists (prefill phase)
-        if context is not None:
-            # Expand context to match batch size: [batch, context_len, hidden_dim]
-            context_expanded = context.unsqueeze(0).expand(num_generations, -1, -1)
-            context_len = context.shape[0]
+        # Track per-sequence generation start positions (after their actual context)
+        gen_start_positions = context_lens.repeat_interleave(num_generations)  # [batch_size]
 
-            # Process context through model with caching
-            result = self._forward(context_expanded, start_pos=0, kv_caches=None, use_cache=True)
+        # Process context (prefill phase) if any context exists
+        if max_context_len > 0:
+            # Left-pad contexts: [num_contexts, max_context_len, hidden_dim]
+            padded_contexts = torch.zeros(
+                num_contexts, max_context_len, hidden_dim, device=self._device, dtype=dtype
+            )
+
+            attention_mask = torch.zeros(
+                num_contexts, max_context_len, dtype=torch.bool, device=self._device
+            )
+            position_ids = torch.zeros(
+                num_contexts, max_context_len, dtype=torch.long, device=self._device
+            )
+
+            for i, (c, c_len) in enumerate(zip(context, context_lens.tolist())):
+                if c is not None and c_len > 0:
+                    offset = max_context_len - c_len
+                    padded_contexts[i, offset:] = c
+                    attention_mask[i, offset:] = True
+                    position_ids[i, offset:] = torch.arange(c_len, device=self._device)
+
+            # Expand for num_generations
+            padded_contexts = padded_contexts.repeat_interleave(num_generations, dim=0)
+            attention_mask = attention_mask.repeat_interleave(num_generations, dim=0)
+            position_ids = position_ids.repeat_interleave(num_generations, dim=0)
+
+            # Prefill: process all contexts through model
+            key_attn_mask = attention_mask.unsqueeze(1).unsqueeze(2).contiguous()
+            result = self._forward(
+                padded_contexts,
+                start_pos=position_ids,
+                kv_caches=None,
+                attn_mask=key_attn_mask,
+                use_cache=True,
+            )
             match result:
                 case (_, list() as caches):
                     kv_caches = caches
                 case _:
                     raise ValueError(f"Unsupported result type: {type(result)}")
-            start_pos = context_len
 
+        # Initialize generation tensor and tracking
+        gen = (
+            bos.unsqueeze(0).expand(batch_size, 1)
+            if bos.ndim == 0
+            else bos.unsqueeze(0).expand(batch_size, -1).unsqueeze(1)
+        )
+        finished = torch.zeros(batch_size, dtype=torch.bool, device=self._device)
+
+        # Generation loop
         for step in range(max_len):
-            # Embed only the last generated token/vector
-            if step == 0:
-                # First step: embed the BOS token
-                if gen.ndim == 2:  # Token case: [batch, 1]
-                    gen_embed = output_embedder.embed(gen)  # [batch, 1, hidden_dim]
-                else:  # Vector case: [batch, 1, 5]
-                    gen_embed = output_embedder.embed(gen)  # [batch, 1, hidden_dim]
-            else:
-                # Subsequent steps: embed only the last token/vector
-                if gen.ndim == 2:  # Token case
-                    last_token = gen[:, -1:]  # [batch, 1]
-                    gen_embed = output_embedder.embed(last_token)  # [batch, 1, hidden_dim]
-                else:  # Vector case
-                    last_vector = gen[:, -1:, :]  # [batch, 1, 5]
-                    gen_embed = output_embedder.embed(last_vector)  # [batch, 1, hidden_dim]
+            # Embed last generated token/vector
+            last_item = gen[:, -1:] if gen.ndim == 2 else gen[:, -1:, :]
+            gen_embed = output_embedder.embed(last_item)
 
-            # Forward pass through model with caching
+            # Build attention mask: context padding + all generated tokens
+            if attention_mask is not None and max_context_len > 0:
+                context_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+                gen_mask = torch.ones(
+                    batch_size, 1, 1, step + 1, dtype=torch.bool, device=self._device
+                )
+                gen_attn_mask = torch.cat([context_mask, gen_mask], dim=-1).contiguous()
+            else:
+                gen_attn_mask = None
+
+            # Forward pass with caching
+            step_positions = (gen_start_positions + step).unsqueeze(1)
             result = self._forward(
-                gen_embed, start_pos=start_pos, kv_caches=kv_caches, use_cache=True
+                gen_embed,
+                start_pos=step_positions,
+                kv_caches=kv_caches,
+                attn_mask=gen_attn_mask,
+                use_cache=True,
             )
             match result:
                 case (pred, list() as new_caches):
@@ -227,41 +357,25 @@ class LocalModel(nn.Module, LossMixin, SamplerMixin, ABC):
                 case _:
                     raise ValueError(f"Unsupported result type: {type(result)}")
 
-            # Update position for next iteration
-            start_pos += 1
-
-            # Sample next token or vector based on embedder type
+            # Sample and check EOS
             if isinstance(output_embedder, VectorEmbedder):
-                assert isinstance(pred, tuple)
-                # Get predictions for last position: [batch, ...]
                 last_pred = tuple(tensor[:, -1] for tensor in pred)
-                assert len(last_pred) == 5
-                # Sample vectors: [batch, 1, 5]
-                next_vectors = self.sample_vector(last_pred, temperature=temperature)
-                # Concatenate: [batch, seq_len+1, 5]
-                gen = torch.cat([gen, next_vectors], dim=1)
-
-                # Check for EOS (when any element of element-wise product equals 1.0)
-                # next_vectors: [batch, 1, 5], eos: [5]
-                eos_check = (next_vectors.squeeze(1) * eos.unsqueeze(0) == 1.0).any(dim=-1)
-                finished = finished | eos_check
+                assert isinstance(last_pred, tuple) and len(last_pred) == 5
+                next_item = self.sample_vector(last_pred, temperature=temperature)
+                eos_check = (next_item.squeeze(1) * eos.unsqueeze(0) == 1.0).any(dim=-1)
             else:
                 assert isinstance(pred, Tensor)
-                # Sample tokens: [batch, 1]
-                next_tokens = self.sample_token(pred[:, -1], temperature=temperature)
-                # Concatenate: [batch, seq_len+1]
-                gen = torch.cat([gen, next_tokens], dim=1)
+                next_item = self.sample_token(pred[:, -1], temperature=temperature)
+                eos_check = next_item.squeeze(1) == eos
 
-                # Check for EOS
-                eos_check = next_tokens.squeeze(1) == eos
-                finished = finished | eos_check
+            gen = torch.cat([gen, next_item], dim=1)
+            finished = finished | eos_check
 
-            # Early stopping if all sequences are done
             if finished.all():
                 break
 
-        # Convert batched tensor to list of individual sequences
-        if gen.ndim == 2:  # Token case: [batch, seq_len]
-            return [gen[i] for i in range(num_generations)]
-        else:  # Vector case: [batch, seq_len, 5]
-            return [gen[i] for i in range(num_generations)]
+        # Reshape: [num_contexts * num_generations, ...] -> list[list[Tensor]]
+        return [
+            [gen[i * num_generations + j] for j in range(num_generations)]
+            for i in range(num_contexts)
+        ]

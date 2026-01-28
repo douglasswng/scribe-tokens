@@ -33,8 +33,8 @@ class MultiHeadAttention(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        mask: torch.Tensor | None = None,
-        start_pos: int = 0,
+        attn_mask: torch.Tensor | None = None,
+        start_pos: int | torch.Tensor = 0,
         kv_cache: tuple[torch.Tensor, torch.Tensor] | None = None,
     ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         batch_size, seq_len, _ = x.shape
@@ -67,8 +67,6 @@ class MultiHeadAttention(nn.Module):
 
         # Store updated cache
         new_kv_cache = (k, v)
-
-        attn_mask = mask if mask is None else ~mask  # invert mask since SDPA uses 1 to mean ignore
 
         # Use Flash Attention 2 via scaled_dot_product_attention
         out = F.scaled_dot_product_attention(

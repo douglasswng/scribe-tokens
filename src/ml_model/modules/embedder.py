@@ -8,6 +8,8 @@ from torch import Tensor
 from constants import (
     DROPOUT,
     HIDDEN_DIM,
+    MDN_RHO_MAX,
+    MDN_STD_MIN,
     NUM_CHARS,
     NUM_MIXTURES,
     UNKNOWN_TOKEN_RATE,
@@ -71,8 +73,8 @@ class VectorEmbedder(Embedder):
 
         mixtures = torch.softmax(mixtures, dim=-1)
         means = means.view(*means.size()[:-1], NUM_MIXTURES, 2)
-        stds = F.softplus(stds.view(*stds.size()[:-1], NUM_MIXTURES, 2)) + 0.1  # stability
-        rhos = torch.tanh(rhos) * 0.99  # stability
+        stds = F.softplus(stds.view(*stds.size()[:-1], NUM_MIXTURES, 2)) + MDN_STD_MIN
+        rhos = torch.tanh(rhos) * MDN_RHO_MAX
 
         return mixtures, means, stds, rhos, pen_states
 

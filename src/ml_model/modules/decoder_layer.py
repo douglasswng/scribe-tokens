@@ -27,7 +27,7 @@ class TransformerDecoderLayer(nn.Module):
         self,
         x: torch.Tensor,
         mask: torch.Tensor | None = None,
-        start_pos: int = 0,
+        start_pos: int | torch.Tensor = 0,
         kv_cache: tuple[torch.Tensor, torch.Tensor] | None = None,
     ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         # Self-attention with residual connection and layer norm

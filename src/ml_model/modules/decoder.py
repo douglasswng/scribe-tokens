@@ -36,22 +36,29 @@ class TransformerDecoder(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def _create_causal_mask(self, seq_len: int, device: torch.device) -> Tensor:
-        """Create causal (lower triangular) mask"""
+        """Create causal (lower triangular) mask
+
+        Convention: True = CAN attend (mask in), False = CANNOT attend (mask out)
+        """
         ones = torch.ones(seq_len, seq_len, device=device)
-        causal_mask = torch.triu(ones, diagonal=1).bool()
+        causal_mask = torch.tril(ones).bool()  # Lower triangular including diagonal
         return causal_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
 
     def forward(
         self,
         x: Tensor,
-        start_pos: int = 0,
+        start_pos: int | Tensor = 0,
         kv_caches: list[tuple[Tensor, Tensor]] | None = None,
+        attn_mask: Tensor | None = None,
         use_cache: bool = False,
     ) -> Tensor | tuple[Tensor, list[tuple[Tensor, Tensor]]]:
-        mask: Tensor | None = None
-        if kv_caches is None:
+        if kv_caches is None:  # in training mode or prefill
             seq_len = x.shape[1]
             mask = self._create_causal_mask(seq_len, x.device)
+            if attn_mask is not None:
+                mask = mask & attn_mask
+        else:  # in inference mode (incremental generation)
+            mask = attn_mask
 
         new_caches: list[tuple[Tensor, Tensor]] = []
         for i, layer in enumerate(self.layers):

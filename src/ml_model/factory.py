@@ -43,16 +43,22 @@ class ModelFactory:
                 ntp_model = cls.load_pretrained(ntp_model_id).local_model
                 assert isinstance(ntp_model, NTPModel)
                 model = HTRModel(repr_embedder=ntp_model.repr_embedder, decoder=ntp_model.decoder)
+            case Task.HTG_SFT:
+                ntp_model_id = ModelId(task=Task.NTP, repr_id=model_id.repr_id)
+                ntp_model = cls.load_pretrained(ntp_model_id).local_model
+                assert isinstance(ntp_model, NTPModel)
+                model = HTGModel(repr_embedder=ntp_model.repr_embedder, decoder=ntp_model.decoder)
             case Task.HTG_GRPO:
-                htg_model_id = ModelId(task=Task.HTG, repr_id=model_id.repr_id)
+                htg_model_id = ModelId(task=Task.HTG_SFT, repr_id=model_id.repr_id)  # SFT better
                 htg_model = cls.load_pretrained(htg_model_id).local_model
                 assert isinstance(htg_model, HTGModel)
 
                 htr_model_id = ModelId(task=Task.HTR_SFT, repr_id=model_id.repr_id)  # SFT better
                 htr_model = cls.load_pretrained(htr_model_id).local_model
+                htr_model.eval()
                 assert isinstance(htr_model, HTRModel)
 
-                model = GRPOModel(htg_model=htg_model, htr_model=htr_model)
+                model = GRPOModel(htg_model=htg_model, htr_callable=htr_model.batch_predict_text)
             case _:
                 raise ValueError(f"Unsupported task: {model_id.task}")
         if model_id.task.need_init_weights:

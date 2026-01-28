@@ -5,8 +5,8 @@
 /tmp/
 __pycache__
 *.ipynb
-.env
-models/
+*.pt
+*.zip
 
 !/artifacts/results/
 !/artifacts/figures/

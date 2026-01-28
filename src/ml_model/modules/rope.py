@@ -26,24 +26,34 @@ class RoPEEmbedding(nn.Module):
         freqs_cis = torch.polar(torch.ones_like(freqs), freqs)
         self.register_buffer("freqs_cis", freqs_cis)
 
-    def apply_rotary_emb(self, x: torch.Tensor, start_pos: int = 0) -> torch.Tensor:
+    def apply_rotary_emb(self, x: torch.Tensor, start_pos: int | torch.Tensor = 0) -> torch.Tensor:
         """
         Apply rotary embedding to input tensor
         Args:
             x: Input tensor of shape (batch_size, seq_len, n_heads, head_dim)
-            start_pos: Starting position for the sequence (useful for inference)
+            start_pos: Position information, can be:
+                - int: Global start position
+                - 2D tensor [batch_size, seq_len]: Explicit position for each element
         """
-        seq_len = x.shape[1]
+        _, seq_len = x.shape[:2]
 
         # Get the appropriate frequency values
         assert isinstance(self.freqs_cis, torch.Tensor)
-        freqs_cis = self.freqs_cis[start_pos : start_pos + seq_len]
+
+        if isinstance(start_pos, int):
+            # Scalar: all sequences use same consecutive positions
+            freqs_cis = self.freqs_cis[start_pos : start_pos + seq_len]
+            freqs_cis = freqs_cis.view(1, seq_len, 1, -1)
+        else:
+            # 2D tensor: explicit position for each element
+            # start_pos: [batch_size, seq_len]
+            assert start_pos.ndim == 2, f"start_pos must be int or 2D tensor, got {start_pos.ndim}D"
+            freqs_cis = self.freqs_cis[start_pos].unsqueeze(2)  # [batch, seq_len, 1, -1]
 
         # Reshape x to complex representation
         x_complex = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
 
         # Apply rotation
-        freqs_cis = freqs_cis.view(1, seq_len, 1, -1)
         x_rotated = x_complex * freqs_cis
 
         # Convert back to real representation

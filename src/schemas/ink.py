@@ -176,8 +176,8 @@ class DigitalInk[T: (float, int)](BaseModel):
         name = name.replace("/", "_")
         name = name[:100]
 
-        pdf_path = TMP_DIR / f"{name}.pdf"
-        plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
+        png_path = TMP_DIR / f"{name}.png"
+        plt.savefig(png_path, format="png", bbox_inches="tight")
         plt.close(fig)
 
     def _create_plot(
@@ -200,8 +200,11 @@ class DigitalInk[T: (float, int)](BaseModel):
 
         return fig, ax
 
-    def to_image(self) -> Image.Image:  # for logging
-        fig = self._create_plot()[0]
+    def to_image(self, show_axes: bool = True) -> Image.Image:  # for logging
+        fig, ax = self._create_plot()
+
+        if not show_axes:
+            ax.axis("off")
 
         buf = io.BytesIO()
         plt.savefig(buf, format="png", bbox_inches="tight", dpi=150)

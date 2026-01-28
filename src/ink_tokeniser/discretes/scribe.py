@@ -66,7 +66,7 @@ class ScribeTokeniser(DiscreteTokeniser):
         tokens: list[Token] = [self.start_token, self.down_token]
         for point in get_stroke_point_iterator(ink).rel_points:
             tokens.extend([scribe_token for scribe_token in self._bres_line_decomp(point.point)])
-            if point.is_stroke_start:
+            if point.is_stroke_start:  # weird but correct
                 tokens.append(self.down_token)
             if point.is_stroke_end:
                 tokens.append(self.up_token)

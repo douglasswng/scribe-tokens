@@ -27,7 +27,9 @@ class Trainer:
         self._checkpointer = Checkpointer(model_id, config)
         self._early_stopper = EarlyStopper(patience=config.patience)
         self._gradient_handler = GradientHandler(config.max_grad_norm)
-        self._batch_processor = BatchProcessor(self._gradient_handler, tracker, use_amp=True)
+        self._batch_processor = BatchProcessor(
+            self._gradient_handler, tracker, grad_accum_steps=config.grad_accum_steps, use_amp=True
+        )
         self._epoch_runner = EpochRunner(self._batch_processor, tracker, config)
 
     def _configure_backends(self) -> None:

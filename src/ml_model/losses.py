@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from constants import GRPO_BETA
 from ml_model.modules.embedder import MDNOutput
 
 
@@ -95,37 +94,23 @@ class LossMixin:
 
         return -masked_log_prob.sum() / mask.sum()
 
-    def grpo_loss(
+    def grpo_loss(  # TRL style
         self,
-        rewards: list[float],
-        log_probs: list[Tensor],
-        ref_log_probs: list[Tensor],
-    ) -> tuple[Tensor, Tensor]:
+        advantages: Tensor,
+        log_probs: Tensor,
+        mask: Tensor,
+    ) -> Tensor:
         """
-        Compute GRPO (Group Relative Policy Optimization) loss.
+        GRPO loss with optional masking for variable-length sequences.
 
         Args:
-            rewards: List of reward values for each sample
-            log_probs: List of log probabilities for each sample under current policy
-            ref_log_probs: List of log probabilities under reference policy (for KL penalty)
-
+            advantages: [batch_size, group_size] - per-sample advantages
+            log_probs: [batch_size, group_size, seq_len] - per-token log probs from policy
+            ref_log_probs: [batch_size, group_size, seq_len] - per-token log probs from reference
+            mask: [batch_size, group_size, seq_len] - boolean mask (True = valid token)
         Returns:
-            tuple: (loss, average_reward)
+            grpo_loss: [] - grpo loss tensor
         """
-        # Compute group advantage
-        mean_reward = sum(rewards) / len(rewards)
-        advantages = torch.tensor([r - mean_reward for r in rewards], device=log_probs[0].device)
-
-        # Compute policy gradient loss for each sample
-        # Policy gradient: -advantage * log_prob + KL penalty
-        loss_tensor: Tensor = torch.stack(
-            [
-                -adv * log_prob + GRPO_BETA * (log_prob - ref_log_prob)
-                for adv, log_prob, ref_log_prob in zip(advantages, log_probs, ref_log_probs)
-            ]
-        ).sum()
-
-        loss = loss_tensor / len(rewards)
-        avg_reward = torch.tensor(mean_reward, device=log_probs[0].device)
-
-        return loss, avg_reward
+        advantages = advantages.unsqueeze(-1).expand_as(log_probs)
+        policy_loss = -torch.exp(log_probs - log_probs.detach()) * advantages
+        return (policy_loss * mask).sum() / mask.sum()

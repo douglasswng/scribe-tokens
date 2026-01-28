@@ -1,208 +1,180 @@
-import copy
-from typing import Self
+from typing import Callable, Self, Sequence
 
 import torch
 from torch import Tensor
+from torch.nn.utils.rnn import pad_sequence
 
-from constants import GRPO_NUM_SAMPLES
+from constants import GRPO_EPSILON, GRPO_NUM_SAMPLES
 from ink_repr.factory import ReprFactory
 from ml_model.locals.htg import HTGModel
-from ml_model.locals.htr import HTRModel
 from ml_model.locals.local import LocalModel
 from ml_model.metrics import compute_cer
 from schemas.batch import Batch
+from schemas.ink import DigitalInk
 from schemas.instance import Instance
+
+type HTRCallable = Callable[[Sequence[Instance]], Sequence[str]]
 
 
 class GRPOModel(LocalModel):
-    def __init__(self, htg_model: HTGModel, htr_model: HTRModel):
+    def __init__(self, htg_model: HTGModel, htr_callable: HTRCallable):
         super().__init__()
         self.htg_model = htg_model
-        self.htr_model = htr_model
+        self.htr_callable = htr_callable
         self.num_samples = GRPO_NUM_SAMPLES
 
-        # Freeze HWR model parameters
-        for param in self.htr_model.parameters():
-            param.requires_grad = False
-        self.htr_model.eval()
+        # Create at eval mode and override train() to ensure stays in eval mode
+        self.eval()
 
-        # Create a separate Reference Model (Deep Copy)
-        # We assume htg_model can be deepcopied. If not, re-instantiate it using factory logic.
-        self.ref_model = copy.deepcopy(self.htg_model)
+    def _update_instance(self, instance: Instance, ink: DigitalInk) -> Instance:
+        updated_parsed = instance.parsed.model_copy(update={"ink": ink})
+        repr = ReprFactory.from_ink(ink, instance.repr_id).to_tensor().to(self._device).detach()
+        return Instance(
+            parsed=updated_parsed,
+            repr_id=instance.repr_id,
+            repr=repr,
+            char=instance.char,
+        )
 
-        # Freeze Reference Model
-        for param in self.ref_model.parameters():
-            param.requires_grad = False
-        self.ref_model.eval()
+    def _generate_instances(self, instances: list[Instance]) -> list[Instance]:
+        gen_inks = self.htg_model.batch_generate_inks(instances, num_generations=self.num_samples)
+        gen_instances = [
+            self._update_instance(orig_instance, gen_ink)
+            for orig_instance, instance_gen_ink in zip(instances, gen_inks)
+            for gen_ink in instance_gen_ink
+        ]
+        return gen_instances
 
-    @torch.no_grad()
-    def _generate_samples(self, instance: Instance, num_samples: int) -> list[tuple[Tensor, str]]:
-        """
-        Generate multiple samples from HTG model for a single instance.
-        Returns list of (generated representation sequence, predicted text) tuples.
-        """
-        # Use HTG model's generate_inks method to generate all samples at once
-        inks = self.htg_model.generate_inks(instance, num_generations=num_samples)
-
-        results = []
-        # Get device from the model
-        device = next(self.htr_model._repr_embedder.parameters()).device
-
-        for ink in inks:
-            # Convert ink back to tensor for generation sequence
-            gen_repr = ReprFactory.from_ink(ink, repr_id=instance.repr_id).to_tensor().to(device)
-
-            # Create a temporary instance for HTR prediction
-            temp_instance = Instance(
-                parsed=instance.parsed,
-                repr_id=instance.repr_id,
-                repr=gen_repr,
-                char=instance.char,
-            )
-            pred_text = self.htr_model.predict_text(temp_instance)
-            results.append((gen_repr, pred_text))
-
-        return results
-
-    def _compute_log_prob(
-        self, instance: Instance, gen_sequence: Tensor, use_ref_model: bool = False
+    def _compute_batch_log_probs(
+        self,
+        instances: list[Instance],
+        model: HTGModel,
     ) -> Tensor:
         """
-        Compute log probability of the generated sequence.
+        Compute log probabilities for all instances in a single batched forward pass.
 
         Args:
-            instance: The input instance
-            gen_sequence: The generated sequence
-            use_ref_model: If True, use reference model weights for KL penalty
+            instances: Flat list of instances to compute log probs for
+            model: HTG model to use for computing log probs
 
         Returns:
-            Tensor: Sum of log probabilities over the sequence (scalar)
+            log_probs: [batch_size, max_seq_len] per-token log probs (0 for padding)
         """
-        model = self.ref_model if use_ref_model else self.htg_model
+        # Embed prompts and completions
+        prompts = [model._char_embedder.embed(inst.char) for inst in instances]
+        completion_inputs = [model._repr_embedder.embed(inst.repr_input) for inst in instances]
 
-        # Use no_grad for frozen reference model to avoid building computation graph
-        ctx = torch.no_grad() if use_ref_model else torch.enable_grad()
+        # Calculate lengths
+        prompt_lens = [p.shape[0] for p in prompts]
+        completion_input_lens = [c.shape[0] for c in completion_inputs]
+        max_completion_input_len = max(completion_input_lens)
 
-        with ctx:
-            # Embed context and target sequence
-            context_embed = model._char_embedder.embed(instance.char).unsqueeze(0)
-            context_len = len(context_embed[0])
-            target_embed = model._repr_embedder.embed(gen_sequence).unsqueeze(0)
+        # Concatenate and pad
+        inputs = [torch.cat([p, c], dim=0) for p, c in zip(prompts, completion_inputs)]
+        input = pad_sequence(inputs, batch_first=True, padding_value=0)
 
-            # Concatenate and forward pass
-            input = torch.cat([context_embed, target_embed], dim=1)
-            pred = model._forward(input)
+        # Single forward pass
+        pred = model._forward(input)
 
-            # Compute log probability based on prediction type using LossMixin methods
-            seq_len = len(gen_sequence)
-            mask = torch.ones(1, seq_len - 1, dtype=torch.bool, device=gen_sequence.device)
+        # Compute per-token log probs
+        batch_size = len(instances)
+        log_probs = torch.zeros(
+            batch_size, max_completion_input_len, device=self._device, dtype=torch.float
+        )
 
-            match pred:
-                case Tensor():
-                    # Token-based: use ce_loss
-                    logits = pred[:, context_len : context_len + seq_len - 1]
-                    target_ids = gen_sequence[1:].unsqueeze(0)
-                    ce = self.ce_loss(logits, target_ids, mask)
-                    log_prob = -ce * (seq_len - 1)
-                case (mixtures, means, stds, rhos, pen_states):
-                    # MDN-based: use nll_loss
-                    mixtures_slice = mixtures[:, context_len : context_len + seq_len - 1]
-                    means_slice = means[:, context_len : context_len + seq_len - 1]
-                    stds_slice = stds[:, context_len : context_len + seq_len - 1]
-                    rhos_slice = rhos[:, context_len : context_len + seq_len - 1]
-                    pen_states_slice = pen_states[:, context_len : context_len + seq_len - 1]
-                    target_vecs = gen_sequence[1:].unsqueeze(0)
-                    pred_slice = (
-                        mixtures_slice,
-                        means_slice,
-                        stds_slice,
-                        rhos_slice,
-                        pen_states_slice,
+        match pred:
+            case Tensor():
+                for i, (prompt_len, completion_len, inst) in enumerate(
+                    zip(prompt_lens, completion_input_lens, instances)
+                ):
+                    logits = pred[i, prompt_len : prompt_len + completion_len]
+                    target = inst.repr_target
+                    log_probs[i, :completion_len] = self._categorical_log_prob(logits, target)
+
+            case (mixtures, means, stds, rhos, pen_states):
+                for i, (prompt_len, completion_len, inst) in enumerate(
+                    zip(prompt_lens, completion_input_lens, instances)
+                ):
+                    target = inst.repr_target
+                    x, y, pen = target[:, 0], target[:, 1], target[:, 2:]
+
+                    coord_log_prob = self._bivariate_gaussian_log_prob(
+                        mixtures[i, prompt_len : prompt_len + completion_len],
+                        means[i, prompt_len : prompt_len + completion_len],
+                        stds[i, prompt_len : prompt_len + completion_len],
+                        rhos[i, prompt_len : prompt_len + completion_len],
+                        x,
+                        y,
                     )
-                    nll = self.nll_loss(pred_slice, target_vecs, mask)
-                    log_prob = -nll * (seq_len - 1)
-                case _:
-                    raise ValueError(f"Unsupported prediction type: {type(pred)}")
+                    pen_log_prob = self._categorical_log_prob(
+                        pen_states[i, prompt_len : prompt_len + completion_len],
+                        torch.argmax(pen, dim=-1),
+                    )
+                    log_probs[i, :completion_len] = coord_log_prob + pen_log_prob
 
-            return log_prob
+            case _:
+                raise ValueError(f"Unsupported prediction type: {type(pred)}")
+
+        return log_probs
 
     def _losses(self, batch: Batch) -> dict[str, Tensor]:
-        """
-        Compute GRPO loss:
-        1. Generate multiple samples per instance
-        2. Evaluate each sample with HTR (compute CER)
-        3. Compute group advantages (reward - mean_group_reward)
-        4. Compute policy gradient loss with advantages
-        5. Optionally add KL penalty with reference policy
-        """
-        all_rewards = []
-        all_log_probs = []
-        all_ref_log_probs = []
+        # Generate samples for each instance
+        gen_instances = self._generate_instances(batch.instances)
 
-        for instance in batch.instances:
-            target_text = instance.parsed.text
+        # Predict text
+        pred_texts = self.htr_callable(gen_instances)
 
-            # Generate samples
-            samples = self._generate_samples(instance, num_samples=self.num_samples)
-            gen_seqs = [sample[0] for sample in samples]
-            pred_texts = [sample[1] for sample in samples]
+        # Compute rewards 1 - cer
+        rewards = [
+            1 - compute_cer(pred_text, inst.parsed.text)
+            for pred_text, inst in zip(pred_texts, gen_instances)
+        ]
 
-            # Calculate rewards
-            cers = [compute_cer(pred_text, target_text) for pred_text in pred_texts]
-            rewards = [1.0 - cer for cer in cers]
+        # Compute batched log probs
+        with torch.enable_grad():
+            log_probs = self._compute_batch_log_probs(gen_instances, self.htg_model)
 
-            # Calculate log probabilities
-            log_probs = [
-                self._compute_log_prob(instance, gen_seq, use_ref_model=False)
-                for gen_seq in gen_seqs
-            ]
-            ref_log_probs = [
-                self._compute_log_prob(instance, gen_seq, use_ref_model=True)
-                for gen_seq in gen_seqs
-            ]
+        # Compute sequence mask for variable-length sequences
+        target_lens = [inst.repr_target.shape[0] for inst in gen_instances]
+        max_len = max(target_lens)
+        mask = torch.zeros(len(gen_instances), max_len, device=self._device, dtype=torch.bool)
+        for i, seq_len in enumerate(target_lens):
+            mask[i, :seq_len] = True
 
-            # Accumulate across all instances
-            all_rewards.extend(rewards)
-            all_log_probs.extend(log_probs)
-            all_ref_log_probs.extend(ref_log_probs)
+        # Convert rewards to tensor and compute group-normalized advantages
+        rewards = torch.tensor(rewards, device=self._device, dtype=torch.float)
+        rewards_grouped = rewards.view(batch.size, self.num_samples)
+        mean_rewards = rewards_grouped.mean(dim=1, keepdim=True)
+        std_rewards = rewards_grouped.std(dim=1, keepdim=True) + GRPO_EPSILON
+        advantages = ((rewards_grouped - mean_rewards) / std_rewards).flatten()
 
-        # Compute GRPO loss using LossMixin method
-        grpo_loss, avg_reward = self.grpo_loss(all_rewards, all_log_probs, all_ref_log_probs)
+        # Log rewards
+        if self.tracker is not None:
+            self.tracker.log_metrics({"reward": rewards.mean().item()})
+            self.tracker.log_metrics({"reward_std": std_rewards.mean().item()})
 
-        return {
-            "grpo_loss": grpo_loss,
-            "avg_reward": avg_reward.detach(),
-            # TODO: make this cleaner
-            "_early_stopper_rebalance": -grpo_loss.detach(),  # NOTE: early stopper monitors the sum
-        }
+        # Compute GRPO loss with masking
+        loss = self.grpo_loss(
+            advantages.view(batch.size, self.num_samples),
+            log_probs.view(batch.size, self.num_samples, -1),
+            mask=mask.view(batch.size, self.num_samples, -1),
+        )
+        return {"grpo_loss": loss}
 
     def monitor(self, batch: Batch) -> None:
-        return self.htg_model.monitor(batch)
+        instance = batch.get_random_instance()
+        gen_ink = self.htg_model.batch_generate_inks([instance], num_generations=1)[0][0]
+        gen_instance = self._update_instance(instance, gen_ink)
+        pred_text = self.htr_callable([gen_instance])[0]
+        self._track_ink(
+            gen_ink, task="HTG_HTR", caption=f"True: {instance.parsed.text} | Pred: {pred_text}"
+        )
+
+    def validation_losses(self, batch: Batch) -> dict[str, Tensor]:
+        """Skip expensive validation for GRPO - return empty metrics."""
+        return {}
 
     def train(self, mode: bool = True) -> Self:
-        """
-        Override train mode to ensure reference and reward models
-        remain in eval mode (frozen).
-        """
-        super().train(mode)
-
-        # Explicitly force these back to eval mode
-        self.htr_model.eval()
-        self.ref_model.eval()
-
+        # GRPO operates entirely in eval mode - always force eval on submodules
+        super().train(False)
         return self
-
-    def state_dict(self, *args, **kwargs):
-        """
-        Only save the trainable htg_model, not the frozen htr_model or ref_model.
-        - htr_model is always loaded from pretrained HTR_SFT in factory
-        - ref_model is always loaded from pretrained HTG in factory
-        """
-        return self.htg_model.state_dict(*args, **kwargs)
-
-    def load_state_dict(self, state_dict, strict=True, assign=False):
-        """
-        Load trained htg_model weights only.
-        ref_model and htr_model remain unchanged (pretrained from factory).
-        """
-        return self.htg_model.load_state_dict(state_dict, strict=strict, assign=assign)

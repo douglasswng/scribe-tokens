@@ -28,7 +28,7 @@ class EarlyStopper:
         """Register stats for early stopping."""
         self._improved = False
 
-        if val_epoch_stats.loss < self._best_loss:
+        if val_epoch_stats.loss <= self._best_loss:  # never stop models that dont have validation
             self._best_loss = val_epoch_stats.loss
             self._counter = 0
             self._improved = True

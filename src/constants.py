@@ -55,9 +55,7 @@ NUM_MIXTURES = 20
 UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
 BATCH_SIZE = 32
 WEIGHT_DECAY = 0.1
-# NUM_EPOCHS = 300
 LEARNING_RATE = 3e-4
-# PATIENCE = int(PATIENCE_FACTOR * NUM_EPOCHS)
 
 HTR_EPOCHS = 200
 HTG_EPOCHS = 100
@@ -76,3 +74,7 @@ AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, i
 # GRPO hyperparameters
 GRPO_NUM_SAMPLES = 16  # number of samples to generate per instance for GRPO
 GRPO_BETA = 0.001  # KL penalty coefficient for GRPO
+
+
+# === Candidate hyperparameters ===
+# LEARNING_RATE = 3e-5

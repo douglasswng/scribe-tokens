@@ -89,7 +89,7 @@ class TokenEmbedder(Embedder):
         super().__init__()
         self._unk_token_id = unk_token_id
 
-        self._embedding = nn.Embedding(VOCAB_SIZE + 1, HIDDEN_DIM, padding_idx=0)
+        self._embedding = nn.Embedding(VOCAB_SIZE + 1, HIDDEN_DIM, padding_idx=0)  # + 1 for pad
         self._dropout = nn.Dropout(DROPOUT)
 
     def _add_unk_token(self, x: Tensor) -> Tensor:

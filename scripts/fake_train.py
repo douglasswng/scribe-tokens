@@ -1,3 +1,4 @@
+import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import Subset
@@ -36,7 +37,13 @@ BATCH_SIZE = 1
 def load_train_state(model_id: ModelId, config: TrainerConfig) -> TrainState:
     model = ModelFactory.create(model_id)
     print(f"Loaded model of size {float(model.num_params) / 1e6:.2f}M params")
-    optimiser = AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    # Use fused AdamW for better performance on CUDA (10-15% faster)
+    optimiser = AdamW(
+        model.parameters(),
+        lr=LEARNING_RATE,
+        weight_decay=WEIGHT_DECAY,
+        fused=torch.cuda.is_available(),
+    )
     scheduler = LambdaLR(optimiser, lr_lambda=lambda epoch: 1.0)
     train_state = TrainState(model, optimiser, scheduler)
 
@@ -127,7 +134,7 @@ if __name__ == "__main__":
     from utils.set_random_seed import set_random_seed
 
     if distributed_context.is_master:
-        clear_folder(CHECKPOINTS_DIR, confirm=True)
+        # clear_folder(CHECKPOINTS_DIR, confirm=True)
         clear_folder(TRACKERS_DIR, confirm=False)
         # clear_folder(MODELS_DIR, confirm=True)
 

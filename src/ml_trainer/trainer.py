@@ -1,3 +1,4 @@
+import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -21,12 +22,21 @@ class Trainer:
     def __init__(self, model_id: ModelId, tracker: Tracker, config: TrainerConfig):
         self._tracker = tracker
         self._config = config
+        self._configure_backends()
 
         self._checkpointer = Checkpointer(model_id, config)
         self._early_stopper = EarlyStopper(patience=config.patience)
         self._gradient_handler = GradientHandler(config.max_grad_norm)
-        self._batch_processor = BatchProcessor(self._gradient_handler, tracker)
+        self._batch_processor = BatchProcessor(self._gradient_handler, tracker, use_amp=True)
         self._epoch_runner = EpochRunner(self._batch_processor, tracker, config)
+
+    def _configure_backends(self) -> None:
+        """Configure PyTorch backends for optimal performance."""
+        if not torch.cuda.is_available():
+            return
+
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     def train(
         self,

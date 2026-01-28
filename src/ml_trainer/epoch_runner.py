@@ -102,9 +102,8 @@ class EpochRunner:
         """Complete epoch, check early stopping, save checkpoints. Returns should_stop."""
         early_stopper.register_stats(train_stats.curr_val_epoch_stats)
         is_best = early_stopper.is_best
-        should_save = is_best or checkpointer.should_save_state(train_state)
 
-        if should_save and distributed_context.is_master:
+        if distributed_context.is_master:
             checkpointer.save_state(train_state)
             if is_best:
                 checkpointer.mark_as_best(train_state.epoch)
@@ -120,7 +119,5 @@ class EpochRunner:
         if not distributed_context.is_master:
             return None
         if len(pbar) == 0:
-            return None
-        if epoch % self._config.monitor_every_n_epochs != 0:
             return None
         return random.randint(0, len(pbar) - 1)

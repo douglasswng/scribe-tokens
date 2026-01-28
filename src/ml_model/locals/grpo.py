@@ -45,9 +45,12 @@ class GRPOModel(LocalModel):
         inks = self.htg_model.generate_inks(instance, num_generations=num_samples)
 
         results = []
+        # Get device from the model
+        device = next(self.htr_model._repr_embedder.parameters()).device
+
         for ink in inks:
             # Convert ink back to tensor for generation sequence
-            gen_repr = ReprFactory.from_ink(ink, repr_id=instance.repr_id).to_tensor()
+            gen_repr = ReprFactory.from_ink(ink, repr_id=instance.repr_id).to_tensor().to(device)
 
             # Create a temporary instance for HTR prediction
             temp_instance = Instance(
@@ -169,7 +172,8 @@ class GRPOModel(LocalModel):
         return {
             "grpo_loss": grpo_loss,
             "avg_reward": avg_reward.detach(),
-            "early_stopper_rebalance": -grpo_loss.detach(),
+            # TODO: make this cleaner
+            "_early_stopper_rebalance": -grpo_loss.detach(),  # NOTE: early stopper monitors the sum
         }
 
     def monitor(self, batch: Batch) -> None:

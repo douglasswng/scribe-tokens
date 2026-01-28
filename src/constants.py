@@ -41,7 +41,7 @@ NUM_CHARS = len(CHARS)  # 79
 VOCAB_SIZE = 32000
 DELTA = 8
 MAX_LEN = int(1e4)
-SCRIBE_DOWNSAMPLE_FACTOR = 16 / DELTA  # for scribe's post processor
+SCRIBE_DOWNSAMPLE_FACTOR = 16 // DELTA  # for scribe's post processor
 
 # Model hyperparameters
 HIDDEN_DIM = 384
@@ -70,3 +70,11 @@ AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, i
 # GRPO hyperparameters
 GRPO_NUM_SAMPLES = 16  # number of samples to generate per instance for GRPO
 GRPO_BETA = 0.001  # KL penalty coefficient for GRPO
+
+# ==== CANDIDATE HYPERPARAMETERS ====
+# Experiment hyperparameters
+WEIGHT_DECAY = 0.1
+LEARNING_RATE = 3e-4
+DROPOUT = 0.2
+NUM_EPOCHS = 200
+PATIENCE = 200

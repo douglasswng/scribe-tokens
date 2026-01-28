@@ -73,7 +73,7 @@ def split_parsed_paths() -> tuple[list[Path], list[Path], list[Path]]:
         else:
             raise ValueError(f"Parsed path {parsed_path} not found in any split file")
 
-    return split_paths(train_paths + val_paths + test_paths)
+    # return split_paths(train_paths + val_paths + test_paths)
     return train_paths, val_paths, test_paths  # TODO:look into this
 
 

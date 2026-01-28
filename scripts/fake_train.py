@@ -30,7 +30,7 @@ from ml_trainer.tracker import SwanLabTracker, Tracker
 from ml_trainer.trainer import Trainer
 
 EXPERIMENT_NAME = "ScribeTokensFake"
-NUM_EPOCHS = 1
+NUM_EPOCHS = 2
 BATCH_SIZE = 1
 CONFIG = TrainerConfig(patience=PATIENCE)
 

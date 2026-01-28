@@ -68,19 +68,17 @@ class MultiHeadAttention(nn.Module):
         # Store updated cache
         new_kv_cache = (k, v)
 
-        # Compute attention scores
-        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        attn_mask = mask if mask is None else ~mask  # invert mask since SDPA uses 1 to mean ignore
 
-        # Apply causal mask
-        if mask is not None:
-            scores = scores.masked_fill(mask, float("-inf"))
-
-        # Apply softmax
-        attn_weights = F.softmax(scores, dim=-1)
-        attn_weights = self.dropout(attn_weights)
-
-        # Apply attention to values
-        out = torch.matmul(attn_weights, v)
+        # Use Flash Attention 2 via scaled_dot_product_attention
+        out = F.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            attn_mask=attn_mask,
+            dropout_p=self.dropout.p if self.training else 0.0,
+            scale=self.scale,
+        )
 
         # Reshape and project output
         out = out.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)

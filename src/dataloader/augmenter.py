@@ -1,8 +1,10 @@
 import random
+
 import numpy as np
 
-from core.data_schema import Parsed, DigitalInk
-from core.constants import SCALE_RANGE, SHEAR_FACTOR, ROTATE_ANGLE, JITTER_SIGMA, AUGMENT_PROB
+from constants import AUGMENT_PROB, JITTER_SIGMA, ROTATE_ANGLE, SCALE_RANGE, SHEAR_FACTOR
+from schemas.ink import DigitalInk
+from schemas.parsed import Parsed
 
 
 def scale_coords(coords: list[np.ndarray], scale_factor: float) -> list[np.ndarray]:
@@ -35,7 +37,7 @@ def jitter_coords(coords: list[np.ndarray], sigma: float) -> list[np.ndarray]:
     """Apply jitter (random noise) to coordinates."""
     if sigma == 0:
         return coords
-    
+
     jittered_coords = []
     for stroke_coords in coords:
         if len(stroke_coords) > 0:
@@ -60,7 +62,7 @@ class AugmenterConfig:
 
         self.reverse = random.random() <= AUGMENT_PROB
 
-    def _sample_arg(self, max_val: float, min_val: float=0, default: float=0) -> float:
+    def _sample_arg(self, max_val: float, min_val: float = 0, default: float = 0) -> float:
         if random.random() <= AUGMENT_PROB:
             return random.uniform(min_val, max_val)
         return default
@@ -74,7 +76,7 @@ class Augmenter:
         # Convert to coordinates
         coords = parsed.ink.to_coords()
         np_coords = [np.array(stroke) for stroke in coords]
-        
+
         # Apply transformations in sequence
         np_coords = scale_coords(np_coords, cls._config.scale_factor)
         np_coords = shear_coords(np_coords, cls._config.shear_factor)
@@ -83,35 +85,11 @@ class Augmenter:
 
         # if cls._config.reverse:
         #     np_coords = reverse_coords(np_coords)
-        
+
         # Convert back to DigitalInk
         augmented_ink = DigitalInk.from_coords(np_coords)
         return parsed.model_copy(update={"ink": augmented_ink})
-    
+
     @classmethod
     def reset_config(cls):
         cls._config = AugmenterConfig()
-
-
-if __name__ == "__main__":
-    from repr.factory import DefaultReprFactory
-    from core.repr import TokenReprId
-
-    parsed = Parsed.load_random()
-    parsed.visualise()
-    augmented_parsed = Augmenter.augment(parsed)
-    augmented_parsed.visualise()
-
-    repr_id = TokenReprId.create_scribe()
-
-    original_tensor = DefaultReprFactory.ink_to_tensor(repr_id, parsed.ink)
-    augmented_tensor = DefaultReprFactory.ink_to_tensor(repr_id, augmented_parsed.ink)
-
-    original_ink = DefaultReprFactory.tensor_to_ink(repr_id, original_tensor)
-    augmented_ink = DefaultReprFactory.tensor_to_ink(repr_id, augmented_tensor)
-    original_ink.visualise()
-    augmented_ink.visualise()
-
-    print("Ink length:", len(parsed.ink))
-    print("Original token count:", original_tensor.size(0))
-    print("Augmented token count:", augmented_tensor.size(0))

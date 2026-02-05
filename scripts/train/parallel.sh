@@ -7,7 +7,7 @@ K=4  # Number of models to train in parallel (change this value as needed)
 TASKS=("HTR" "HTG" "NTP" "HTR_SFT" "HTG_SFT")  # Excluding HTG_GRPO for now
 REPRS=("scribe" "point5" "rel" "text")  # Excluding point3 and abs for now
 PYTHON_CMD=".venv/bin/python"
-SCRIPT_PATH="scripts.train"
+SCRIPT_PATH="scripts.train.train"
 
 # Colors for output
 GREEN='\033[0;32m'

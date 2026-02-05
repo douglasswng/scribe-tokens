@@ -1,3 +1,4 @@
+import copy
 from typing import Callable, Self, Sequence
 
 import torch
@@ -22,6 +23,13 @@ class GRPOModel(LocalModel):
         self.htg_model = htg_model
         self.htr_callable = htr_callable
         self.num_samples = GRPO_NUM_SAMPLES
+
+        # Create at eval mode and override train() to ensure stays in eval mode
+        self.ref_model = copy.deepcopy(self.htg_model)
+
+        # Freeze Reference Model
+        for param in self.ref_model.parameters():
+            param.requires_grad = False
 
         # Create at eval mode and override train() to ensure stays in eval mode
         self.eval()
@@ -121,10 +129,10 @@ class GRPOModel(LocalModel):
         # Generate samples for each instance
         gen_instances = self._generate_instances(batch.instances)
 
-        # Predict text
+        # Predicted text
         pred_texts = self.htr_callable(gen_instances)
 
-        # Compute rewards 1 - cer
+        # Compute rewards
         rewards = [
             1 - compute_cer(pred_text, inst.parsed.text)
             for pred_text, inst in zip(pred_texts, gen_instances)
@@ -133,6 +141,8 @@ class GRPOModel(LocalModel):
         # Compute batched log probs
         with torch.enable_grad():
             log_probs = self._compute_batch_log_probs(gen_instances, self.htg_model)
+        with torch.no_grad():
+            ref_log_probs = self._compute_batch_log_probs(gen_instances, self.ref_model)
 
         # Compute sequence mask for variable-length sequences
         target_lens = [inst.repr_target.shape[0] for inst in gen_instances]
@@ -157,7 +167,8 @@ class GRPOModel(LocalModel):
         loss = self.grpo_loss(
             advantages.view(batch.size, self.num_samples),
             log_probs.view(batch.size, self.num_samples, -1),
-            mask=mask.view(batch.size, self.num_samples, -1),
+            ref_log_probs.view(batch.size, self.num_samples, -1),
+            mask.view(batch.size, self.num_samples, -1),
         )
         return {"grpo_loss": loss}
 
@@ -178,3 +189,18 @@ class GRPOModel(LocalModel):
         # GRPO operates entirely in eval mode - always force eval on submodules
         super().train(False)
         return self
+
+    def state_dict(self, *args, **kwargs):
+        """
+        Only save the trainable htg_model, not the frozen htr_model or ref_model.
+        - htr_model is always loaded from pretrained HTR_SFT in factory
+        - ref_model is always loaded from pretrained HTG in factory
+        """
+        return self.htg_model.state_dict(*args, **kwargs)
+
+    def load_state_dict(self, state_dict, strict=True, assign=False):
+        """
+        Load trained htg_model weights only.
+        ref_model and htr_model remain unchanged (pretrained from factory).
+        """
+        return self.htg_model.load_state_dict(state_dict, strict=strict, assign=assign)

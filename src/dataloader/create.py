@@ -67,9 +67,9 @@ def _partial_create_dataloader(
 def _create_word_dataloaders(
     repr_id: ReprId, batch_size: int, num_workers: int, pin_memory: bool, persistent_workers: bool
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
-    train_dataset = WordDataset(repr_id=repr_id, len=batch_size * GRPO_MONITOR_EVERY)
-    val_dataset = WordDataset(repr_id=repr_id, len=batch_size)
-    test_dataset = WordDataset(repr_id=repr_id, len=0)
+    train_dataset = WordDataset(repr_id=repr_id, length=batch_size * GRPO_MONITOR_EVERY)
+    val_dataset = WordDataset(repr_id=repr_id, length=batch_size)
+    test_dataset = WordDataset(repr_id=repr_id, length=0)
 
     partial_create_dataloader = _partial_create_dataloader(
         batch_size=batch_size,

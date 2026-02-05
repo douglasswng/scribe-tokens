@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
+from constants import GRPO_BETA
 from ml_model.modules.embedder import MDNOutput
 
 
@@ -98,6 +99,7 @@ class LossMixin:
         self,
         advantages: Tensor,
         log_probs: Tensor,
+        ref_log_probs: Tensor,
         mask: Tensor,
     ) -> Tensor:
         """
@@ -113,4 +115,10 @@ class LossMixin:
         """
         advantages = advantages.unsqueeze(-1).expand_as(log_probs)
         policy_loss = -torch.exp(log_probs - log_probs.detach()) * advantages
-        return (policy_loss * mask).sum() / mask.sum()
+
+        log_ratio = ref_log_probs - log_probs
+        ratio = torch.exp(log_ratio)
+        kl_div = ratio - log_ratio - 1
+
+        loss = policy_loss + GRPO_BETA * kl_div
+        return (loss * mask).sum() / mask.sum()

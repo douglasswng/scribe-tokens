@@ -2,10 +2,10 @@
 Unified training script for ScribeTokens models.
 
 Supports:
-- Single model training: python -m scripts.train --task HTR --repr scribe
-- All models sequential: python -m scripts.train --all
-- Quick test mode: python -m scripts.train --all --test
-- Distributed training: torchrun --nproc_per_node=2 -m scripts.train --all --test
+- Single model training: python -m scripts.train.train --task HTR --repr scribe
+- All models sequential: python -m scripts.train.train --all
+- Quick test mode: python -m scripts.train.train --all --test
+- Distributed training: torchrun --nproc_per_node=2 -m scripts.train.train --all --test
 """
 
 import argparse
@@ -28,7 +28,7 @@ from ml_trainer.config import TrainerConfig
 from ml_trainer.state import TrainState
 from ml_trainer.tracker import SwanLabTracker, Tracker
 from ml_trainer.trainer import Trainer
-from scripts.train_utils import get_params_dict
+from scripts.train.utils import get_params_dict
 from utils.clear_folder import clear_folder
 from utils.distributed_context import distributed_context
 from utils.set_random_seed import set_random_seed
@@ -148,19 +148,19 @@ def parse_args():
         epilog="""
 Examples:
   # Single model training
-  python -m scripts.train --task HTR --repr scribe
+  python -m scripts.train.train --task HTR --repr scribe
 
   # Train all default models (sequential)
-  python -m scripts.train --all
+  python -m scripts.train.train --all
 
   # Quick test with small dataset
-  python -m scripts.train --all --test
+  python -m scripts.train.train --all --test
 
   # Distributed training (2 GPUs)
-  torchrun --nproc_per_node=2 -m scripts.train --all --test
+  torchrun --nproc_per_node=2 -m scripts.train.train --all --test
 
   # Custom experiment name
-  python -m scripts.train --all --experiment-name "MyExperiment"
+  python -m scripts.train.train --all --experiment-name "MyExperiment"
         """,
     )
 

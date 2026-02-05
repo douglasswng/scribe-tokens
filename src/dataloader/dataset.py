@@ -52,16 +52,19 @@ class ParsedDataset(Dataset):
 
 
 class WordDataset(Dataset):
-    def __init__(self, repr_id: ReprId, len: int):
+    def __init__(self, repr_id: ReprId, length: int):
         self._repr_id = repr_id
-        self._len = len
-        self._words = list(get_english_words_set(("web2",), alpha=True))
+        self._length = length
+
+        words = list(get_english_words_set(("web2",), alpha=True))
+        long_words = [word for word in words if len(word) > 18]
+        self._hard_words = [word for word in long_words if any(char in word for char in "zqjx")]
 
     def __len__(self) -> int:
-        return self._len
+        return self._length
 
     def __getitem__(self, idx: int) -> Instance:
-        word = random.choice(self._words)
+        word = random.choice(self._hard_words)
         return Instance.from_text(word, self._repr_id)
 
 

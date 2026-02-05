@@ -58,7 +58,7 @@ WEIGHT_DECAY = 0.1
 LEARNING_RATE = 3e-4
 NUM_EPOCHS = 100
 PATIENCE_FACTOR = 0.1
-GRAD_ACCUM_STEPS = 1
+GRAD_ACCUM_STEPS = 2
 
 # Augmenter hyperparameters
 SCALE_RANGE = 0.3  # scale factor between (1 - SCALE_RANGE, 1 + SCALE_RANGE)
@@ -70,6 +70,9 @@ AUGMENT_PROB = 0.5  # each augmentation has this probability of being applied, i
 # GRPO hyperparameters
 GRPO_NUM_SAMPLES = 8  # number of samples to generate per instance for GRPO
 LEARNING_RATE = 3e-5
+GRAD_ACCUM_STEPS = 2
+GRPO_BETA = 1e-3
+
 GRPO_EPSILON = 1e-4  # stabilise division by std in advtange calculation
 GRPO_STEPS = 500  # no concept of epochs for GRPO (30 seconds per step on BH200)
 GRPO_MONITOR_EVERY = 10

@@ -8,12 +8,7 @@ from constants import (
     DELTA,
     DROPOUT,
     FFN_FACTOR,
-    GRPO_EPSILON,
-    GRPO_MONITOR_EVERY,
-    GRPO_NUM_SAMPLES,
-    GRPO_STEPS,
     HIDDEN_DIM,
-    NUM_EPOCHS,
     INK_SCALE,
     JITTER_SIGMA,
     LEARNING_RATE,
@@ -21,6 +16,7 @@ from constants import (
     MDN_RHO_MAX,
     MDN_STD_MIN,
     NUM_CHARS,
+    NUM_EPOCHS,
     NUM_HEADS,
     NUM_LAYERS,
     NUM_MIXTURES,
@@ -60,7 +56,6 @@ def get_params_dict() -> dict[str, Any]:
         "learning_rate": LEARNING_RATE,
         "weight_decay": WEIGHT_DECAY,
         "unknown_token_rate": UNKNOWN_TOKEN_RATE,
-        # Task-specific epochs
         "patience_factor": PATIENCE_FACTOR,
         # Tokenization
         "vocab_size": VOCAB_SIZE,
@@ -74,11 +69,6 @@ def get_params_dict() -> dict[str, Any]:
         "rotate_angle": ROTATE_ANGLE,
         "jitter_sigma": JITTER_SIGMA,
         "augment_prob": AUGMENT_PROB,
-        # GRPO hyperparameters
-        "grpo_num_samples": GRPO_NUM_SAMPLES,
-        "grpo_epsilon": GRPO_EPSILON,
-        "grpo_steps": GRPO_STEPS,
-        "grpo_monitor_every": GRPO_MONITOR_EVERY,
         # Vector representation stability
         "ink_scale": INK_SCALE,
         "mdn_std_min": MDN_STD_MIN,

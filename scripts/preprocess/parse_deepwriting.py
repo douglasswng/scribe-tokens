@@ -6,7 +6,7 @@ from constants import DATASET, PARSED_DIR, RAW_DIR
 from schemas.ink import DigitalInk
 from schemas.parsed import Parsed
 
-assert DATASET == "deepwriting"
+assert DATASET == "deepwriting", "Dataset must be deepwriting"
 
 
 def get_stroke_data_for_word(

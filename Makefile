@@ -11,17 +11,17 @@ format-check:
 
 # --- Training ---
 train:
-	.venv/bin/python -m scripts.train.train --all
+	.venv/bin/python -m scripts.train.main --all
 
 train-parallel:
 	bash scripts/train/parallel.sh
 
 # --- Testing ---
 test:
-	.venv/bin/python -m scripts.train.train --all --test
+	.venv/bin/python -m scripts.train.main --all --test
 
 test-dist:
-	torchrun --nproc_per_node=2 -m scripts.train.train --all --test
+	torchrun --nproc_per_node=2 -m scripts.train.main --all --test
 
 # --- Utilities ---
 kill:

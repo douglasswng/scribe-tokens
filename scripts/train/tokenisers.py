@@ -1,10 +1,13 @@
 from typing import Iterator
 
+from constants import DATASET
 from dataloader.split import DataSplit, create_datasplit
 from ink_tokeniser.factory import TokeniserId, TokenType
 from ink_tokeniser.trainer import InkBpeTrainer
 from schemas.ink import DigitalInk
 from schemas.parsed import Parsed
+
+assert DATASET == "iam", "Use IAM for more robust tokenisers"
 
 DELTAS = [1, 2, 4, 8, 16, 32]
 MAX_VOCAB_SIZE = 100_000

@@ -1,4 +1,5 @@
 from ink_tokeniser.discretes.discrete import DiscreteTokeniser
+from ink_tokeniser.id import TokeniserId
 from ink_tokeniser.preprocessor import Preprocessor
 from ink_tokeniser.tokens import Token
 from ink_tokeniser.trained import TrainedTokeniser
@@ -8,10 +9,12 @@ from schemas.ink import DigitalInk
 class Tokeniser:
     def __init__(
         self,
+        id: TokeniserId,
         preprocessor: Preprocessor,
         discrete_tokeniser: DiscreteTokeniser,
         trained_tokeniser: TrainedTokeniser | None = None,
     ):
+        self.id = id
         self._preprocessor = preprocessor
         self._discrete_tokeniser = discrete_tokeniser
         self._trained_tokeniser = trained_tokeniser

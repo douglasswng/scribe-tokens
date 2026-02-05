@@ -1,12 +1,12 @@
 .DS_Store
+__pycache__
+.venv
+
 /archive/
-/artifacts/*
+/artifacts/
 /data/
 /tmp/
-__pycache__
+
 *.ipynb
 *.pt
 *.zip
-
-!/artifacts/results/
-!/artifacts/figures/

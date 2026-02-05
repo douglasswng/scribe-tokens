@@ -35,6 +35,7 @@ class DiscreteFactory:
 
 class TrainedFactory:
     @classmethod
+    @lru_cache(maxsize=1)
     def _load_vocab(cls, vocab_path: Path) -> dict[Token, int]:
         vocab: dict[Token, int] = {}
         with open(vocab_path, "r") as f:
@@ -45,6 +46,7 @@ class TrainedFactory:
         return vocab
 
     @classmethod
+    @lru_cache(maxsize=1)
     def _load_merges(cls, merges_path: Path) -> list[tuple[RegularToken, RegularToken]]:
         merges: list[tuple[RegularToken, RegularToken]] = []
         with open(merges_path, "r") as f:
@@ -99,4 +101,4 @@ class TokeniserFactory:
         preprocessor = DeltaSmoothPreprocessor(delta=id.delta, downsample_factor=downsample_factor)
         discrete_tokeniser = DiscreteFactory.create_discrete_tokeniser(id)
         trained_tokeniser = TrainedFactory.from_pretrained(id)
-        return Tokeniser(preprocessor, discrete_tokeniser, trained_tokeniser)
+        return Tokeniser(id, preprocessor, discrete_tokeniser, trained_tokeniser)

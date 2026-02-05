@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from constants import GRPO_BETA
 from ml_model.modules.embedder import MDNOutput
 
 
@@ -94,31 +93,3 @@ class LossMixin:
         masked_log_prob: Tensor = total_log_prob * mask
 
         return -masked_log_prob.sum() / mask.sum()
-
-    def grpo_loss(  # TRL style
-        self,
-        advantages: Tensor,
-        log_probs: Tensor,
-        ref_log_probs: Tensor,
-        mask: Tensor,
-    ) -> Tensor:
-        """
-        GRPO loss with optional masking for variable-length sequences.
-
-        Args:
-            advantages: [batch_size, group_size] - per-sample advantages
-            log_probs: [batch_size, group_size, seq_len] - per-token log probs from policy
-            ref_log_probs: [batch_size, group_size, seq_len] - per-token log probs from reference
-            mask: [batch_size, group_size, seq_len] - boolean mask (True = valid token)
-        Returns:
-            grpo_loss: [] - grpo loss tensor
-        """
-        advantages = advantages.unsqueeze(-1).expand_as(log_probs)
-        policy_loss = -torch.exp(log_probs - log_probs.detach()) * advantages
-
-        log_ratio = ref_log_probs - log_probs
-        ratio = torch.exp(log_ratio)
-        kl_div = ratio - log_ratio - 1
-
-        loss = policy_loss + GRPO_BETA * kl_div
-        return (loss * mask).sum() / mask.sum()

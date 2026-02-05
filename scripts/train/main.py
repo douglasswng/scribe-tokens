@@ -2,10 +2,10 @@
 Unified training script for ScribeTokens models.
 
 Supports:
-- Single model training: python -m scripts.train.train --task HTR --repr scribe
-- All models sequential: python -m scripts.train.train --all
-- Quick test mode: python -m scripts.train.train --all --test
-- Distributed training: torchrun --nproc_per_node=2 -m scripts.train.train --all --test
+- Single model training: python -m scripts.train.main --task HTR --repr scribe
+- All models sequential: python -m scripts.train.main --all
+- Quick test mode: python -m scripts.train.main --all --test
+- Distributed training: torchrun --nproc_per_node=2 -m scripts.train.main --all --test
 """
 
 import argparse
@@ -15,7 +15,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import Subset
 
-from constants import GRAD_ACCUM_STEPS, LEARNING_RATE, TRACKERS_DIR, WEIGHT_DECAY
+from constants import EXPERIMENT_NAME, GRAD_ACCUM_STEPS, LEARNING_RATE, TRACKERS_DIR, WEIGHT_DECAY
 from dataloader.create import _create_dataloader, create_dataloaders
 from dataloader.dataset import create_datasets
 from dataloader.split import create_datasplit
@@ -148,19 +148,19 @@ def parse_args():
         epilog="""
 Examples:
   # Single model training
-  python -m scripts.train.train --task HTR --repr scribe
+  python -m scripts.train.main --task HTR --repr scribe
 
   # Train all default models (sequential)
-  python -m scripts.train.train --all
+  python -m scripts.train.main --all
 
   # Quick test with small dataset
-  python -m scripts.train.train --all --test
+  python -m scripts.train.main --all --test
 
   # Distributed training (2 GPUs)
-  torchrun --nproc_per_node=2 -m scripts.train.train --all --test
+  torchrun --nproc_per_node=2 -m scripts.train.main --all --test
 
   # Custom experiment name
-  python -m scripts.train.train --all --experiment-name "MyExperiment"
+  python -m scripts.train.main --all --experiment-name "MyExperiment"
         """,
     )
 
@@ -234,7 +234,7 @@ def main() -> None:
     elif args.test:
         experiment_name = "ScribeTokensTest"
     else:
-        experiment_name = "ScribeTokens0202"
+        experiment_name = EXPERIMENT_NAME
 
     # Clear trackers on master process if in test mode
     if args.test and distributed_context.is_master:

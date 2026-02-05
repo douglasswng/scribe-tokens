@@ -5,8 +5,6 @@ from typing import Self
 
 from constants import (
     CHECKPOINTS_DIR,
-    GRPO_MONITOR_EVERY,
-    GRPO_STEPS,
     MODELS_DIR,
     NUM_EPOCHS,
     PATIENCE_FACTOR,
@@ -20,7 +18,6 @@ class Task(StrEnum):
     NTP = "NTP"
     HTR_SFT = "HTR_SFT"
     HTG_SFT = "HTG_SFT"
-    HTG_GRPO = "HTG_GRPO"
 
     @property
     def need_init_weights(self) -> bool:
@@ -32,11 +29,7 @@ class Task(StrEnum):
 
     @property
     def num_epochs(self) -> int:
-        match self:
-            case Task.HTG_GRPO:
-                return GRPO_STEPS // GRPO_MONITOR_EVERY
-            case _:
-                return NUM_EPOCHS
+        return NUM_EPOCHS
 
     @property
     def patience(self) -> int:

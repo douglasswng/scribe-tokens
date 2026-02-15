@@ -22,8 +22,8 @@ def test_factory_create_all_models():
             print(f"  Parameters: {float(model.num_params) / 1e6:.2f}M")
             successful.append(model_id)
         except FileNotFoundError as e:
-            # Expected for tasks that require pretrained models (HTR_SFT, HTG_GRPO)
-            if model_id.task in {Task.HTR_SFT, Task.HTG_GRPO}:
+            # Expected for tasks that require pretrained models (HTR_SFT)
+            if model_id.task in {Task.HTR_SFT}:
                 print(f"⚠ Skipped {model_id.task} (requires pretrained model): {e}")
                 successful.append(model_id)  # Consider this expected behavior as success
             else:

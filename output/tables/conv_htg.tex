@@ -1,0 +1,13 @@
+\begin{tabular}{l cccc cccc}
+\toprule
+ & \multicolumn{4}{c}{IAM} & \multicolumn{4}{c}{DeepWriting} \\
+\cmidrule(lr){2-5} \cmidrule(lr){6-9}
+Method & PT Ep. & No PT & +PT & Speedup & PT Ep. & No PT & +PT & Speedup \\
+\midrule
+Point-5 & 36 & 41 & 20 & 2.0$\times$ & 55 & 61 & -- & -- \\
+RelTokens & 72 & 80 & 1 & 80.0$\times$ & 99 & 98 & 18 & \textbf{5.4$\times$} \\
+TextTokens & 99 & 87 & 4 & 21.8$\times$ & 100 & 99 & 19 & 5.2$\times$ \\
+\midrule
+ScribeTokens (Ours) & 90 & 83 & 1 & \textbf{83.0$\times$} & 99 & 96 & 27 & 3.6$\times$ \\
+\bottomrule
+\end{tabular}

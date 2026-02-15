@@ -19,7 +19,7 @@ def test_ntp_model():
             persistent_workers=False,
         )
 
-        repr_embedder = create_embedder(model_id.repr_id)
+        repr_embedder = create_embedder(model_id)
         model = NTPModel(repr_embedder=repr_embedder).to(distributed_context.device)
 
         for batch in train_loader:

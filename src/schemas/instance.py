@@ -9,6 +9,7 @@ from ink_repr.factory import ReprFactory
 from ink_repr.id import ReprId
 from schemas.ink import DigitalInk
 from schemas.parsed import Parsed
+from utils.distributed_context import distributed_context
 
 
 class IdMapper:
@@ -96,3 +97,12 @@ class Instance:
     @property
     def repr_eos(self) -> Tensor:
         return self.repr[-1]
+
+    def to_device(self) -> Self:
+        device = distributed_context.device
+        return type(self)(
+            parsed=self.parsed,
+            repr_id=self.repr_id,
+            repr=self.repr.to(device, non_blocking=True),
+            char=self.char.to(device, non_blocking=True),
+        )

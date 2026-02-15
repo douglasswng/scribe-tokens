@@ -72,7 +72,7 @@ class HTGModel(LocalModel):
     def batch_generate_inks(
         self,
         instances: Sequence[Instance],
-        max_len: int = 500,
+        max_len: int = 1000,
         temperature: float = 1.0,
         num_generations: int = 1,
     ) -> list[list[DigitalInk]]:

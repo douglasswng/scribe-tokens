@@ -13,15 +13,15 @@ format-check:
 train:
 	.venv/bin/python -m scripts.train.main --all
 
+train-test:
+	.venv/bin/python -m scripts.train.main --all --test
+
 train-parallel:
 	bash scripts/train/parallel.sh
 
-# --- Testing ---
-test:
-	.venv/bin/python -m scripts.train.main --all --test
-
-test-dist:
-	torchrun --nproc_per_node=2 -m scripts.train.main --all --test
+# --- Evaluating ---
+eval:
+	.venv/bin/python -m scripts.eval.main --all
 
 # --- Utilities ---
 kill:

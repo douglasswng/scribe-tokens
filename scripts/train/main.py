@@ -28,7 +28,7 @@ from ml_trainer.config import TrainerConfig
 from ml_trainer.state import TrainState
 from ml_trainer.tracker import SwanLabTracker, Tracker
 from ml_trainer.trainer import Trainer
-from scripts.train.utils import get_params_dict
+from scripts.train.train_utils import get_params_dict
 from utils.clear_folder import clear_folder
 from utils.distributed_context import distributed_context
 from utils.set_random_seed import set_random_seed

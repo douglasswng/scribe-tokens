@@ -35,7 +35,7 @@ class DiscreteFactory:
 
 class TrainedFactory:
     @classmethod
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=128)
     def _load_vocab(cls, vocab_path: Path) -> dict[Token, int]:
         vocab: dict[Token, int] = {}
         with open(vocab_path, "r") as f:
@@ -46,7 +46,7 @@ class TrainedFactory:
         return vocab
 
     @classmethod
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=128)
     def _load_merges(cls, merges_path: Path) -> list[tuple[RegularToken, RegularToken]]:
         merges: list[tuple[RegularToken, RegularToken]] = []
         with open(merges_path, "r") as f:

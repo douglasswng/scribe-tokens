@@ -1,0 +1,17 @@
+model_id,dataset,cer,accuracy
+"Task: HTG, Repr: ScribeTokens-8 (vocab_size: 32000)",deepwriting,0.1546836771938126,0.7277850021673169
+"Task: HTG_SFT, Repr: ScribeTokens-8 (vocab_size: 32000)",deepwriting,0.1602205557509428,0.682271348071088
+"Task: HTG, Repr: RelTokens-8 (vocab_size: 32000)",deepwriting,0.12748784068488803,0.7303857824013871
+"Task: HTG_SFT, Repr: RelTokens-8 (vocab_size: 32000)",deepwriting,0.12979749789252198,0.7247507585609017
+"Task: HTG, Repr: TextTokens-8 (vocab_size: 32000)",deepwriting,0.15315917510660493,0.7084958820979628
+"Task: HTG_SFT, Repr: TextTokens-8 (vocab_size: 32000)",deepwriting,0.1411873448681182,0.7260511486779367
+"Task: HTG, Repr: Point-5",deepwriting,0.14356047427645377,0.7108799306458604
+"Task: HTG_SFT, Repr: Point-5",deepwriting,0.2683659930973095,0.5123537061118335
+"Task: HTG, Repr: ScribeTokens-8 (vocab_size: 32000)",iam,0.17329651937819474,0.1293419937870658
+"Task: HTG_SFT, Repr: ScribeTokens-8 (vocab_size: 32000)",iam,0.10452059610278715,0.23835074837616493
+"Task: HTG, Repr: RelTokens-8 (vocab_size: 32000)",iam,0.25889078640868096,0.04433775769556622
+"Task: HTG_SFT, Repr: RelTokens-8 (vocab_size: 32000)",iam,0.11931113291486564,0.20333239197966677
+"Task: HTG, Repr: TextTokens-8 (vocab_size: 32000)",iam,0.1365154836023898,0.16577238068342276
+"Task: HTG_SFT, Repr: TextTokens-8 (vocab_size: 32000)",iam,0.10454826514058006,0.22705450437729455
+"Task: HTG, Repr: Point-5",iam,0.7029229872514301,0.0002824060999717594
+"Task: HTG_SFT, Repr: Point-5",iam,0.16828963789510104,0.15955944648404405

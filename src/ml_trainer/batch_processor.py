@@ -10,7 +10,6 @@ from ml_trainer.state import TrainState
 from ml_trainer.stats import BatchStats, TrainStats
 from ml_trainer.tracker import Tracker
 from schemas.batch import Batch
-from schemas.instance import Instance
 from utils.distributed_context import distributed_context
 
 
@@ -30,20 +29,6 @@ class BatchProcessor:
         self._use_amp = use_amp and torch.cuda.is_available()
         self._scaler = GradScaler("cuda") if self._use_amp else None
         self._accum_step = 0  # Track current accumulation step
-
-    def move_batch_to_device(self, batch: Batch) -> Batch:
-        """Move all tensors in the batch to the appropriate device."""
-        device = distributed_context.device
-        moved_instances = [
-            Instance(
-                parsed=instance.parsed,
-                repr_id=instance.repr_id,
-                repr=instance.repr.to(device, non_blocking=True),
-                char=instance.char.to(device, non_blocking=True),
-            )
-            for instance in batch.instances
-        ]
-        return Batch(instances=moved_instances)
 
     def process_train_batch(
         self, train_state: TrainState, train_stats: TrainStats, batch: Batch

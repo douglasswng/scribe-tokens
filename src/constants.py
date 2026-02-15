@@ -61,8 +61,8 @@ UNKNOWN_TOKEN_RATE = 0.004  # match the unknown rate on the validation set
 BATCH_SIZE = 64 if DATASET == "deepwriting" else 32
 WEIGHT_DECAY = 0.1
 LEARNING_RATE = 3e-4
-NUM_EPOCHS = 100
-PATIENCE_FACTOR = 0.1
+NUM_EPOCHS = 200
+PATIENCE_FACTOR = 0.2
 GRAD_ACCUM_STEPS = 1
 
 # Augmenter hyperparameters

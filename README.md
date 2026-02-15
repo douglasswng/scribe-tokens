@@ -55,7 +55,7 @@ scribe-tokens/
 ├── scripts/
 │   ├── preprocess/         # parse raw datasets into parsed JSON + splits
 │   ├── train/              # model/tokenizer training entrypoints
-│   ├── eval/               # HTR/HTG evaluation
+│   ├── eval/               # tokenizer + HTR/HTG evaluation
 │   ├── plot/               # tables + plotting scripts
 │   └── utils/              # project utilities
 ├── src/                    # core library code (models, tokenizers, loaders)
@@ -132,7 +132,30 @@ Then create random train/val/test splits:
 uv run python -m scripts.preprocess.split_deepwriting
 ```
 
-### Training
+### Tokenizer Analysis
+
+Use this sweep/eval flow to benchmark tokenizers.
+
+```bash
+# 1) train tokenizer families (delta/vocab sweep)
+uv run python -m scripts.train.tokenisers
+
+# 2) evaluate tokenizer quality metrics
+uv run python -m scripts.eval.compression
+uv run python -m scripts.eval.oov
+
+# 3) plot tokenizer metrics
+uv run python -m scripts.plot.compression
+uv run python -m scripts.plot.oov
+```
+
+Outputs:
+- `output/results/compression.csv`
+- `output/results/oov.csv`
+- `output/figures/compression.pdf`
+- `output/figures/oov.pdf`
+
+### Deep Learning Training
 
 #### Unified trainer
 
@@ -160,14 +183,6 @@ CLI options (from `scripts/train/main.py`):
 
 Supported tasks:
 - `HTR`, `HTG`, `NTP`, `HTR_SFT`, `HTG_SFT`
-
-#### Tokenizer training sweep
-
-Trains many tokenizer configs (delta/vocab combinations) if missing:
-
-```bash
-uv run python -m scripts.train.tokenisers
-```
 
 ### Evaluation
 
@@ -274,6 +289,9 @@ export PYTHONPATH="$PWD/src"
 # set DATASET="iam" in src/constants.py
 
 uv run python -m scripts.preprocess.parse_iam
+uv run python -m scripts.train.tokenisers
+uv run python -m scripts.eval.compression
+uv run python -m scripts.eval.oov
 make train
 make eval
 uv run python -m scripts.plot.results
@@ -288,6 +306,9 @@ export PYTHONPATH="$PWD/src"
 
 uv run python -m scripts.preprocess.parse_deepwriting
 uv run python -m scripts.preprocess.split_deepwriting
+uv run python -m scripts.train.tokenisers
+uv run python -m scripts.eval.compression
+uv run python -m scripts.eval.oov
 make train
 make eval
 uv run python -m scripts.plot.results

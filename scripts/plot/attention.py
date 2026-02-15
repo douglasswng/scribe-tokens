@@ -18,11 +18,9 @@ import torch
 import torch.nn.functional as F
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
-from matplotlib.colors import Normalize
 from scipy.signal import savgol_filter
 
 from constants import DATASET, FIGURES_DIR
-from dataloader.create import create_dataloaders
 from ink_tokeniser.discretes.scribe import STR_TO_COORD, ScribeTokeniser
 from ink_tokeniser.discretes.text import SEP, TextTokeniser
 from ink_tokeniser.factory import TokeniserFactory
@@ -35,9 +33,14 @@ from ml_model.locals.htr import HTRModel
 from ml_model.modules.mha import MultiHeadAttention
 from schemas.ink import DigitalInk
 from schemas.instance import Instance
+from schemas.parsed import Parsed
 
 assert DATASET == "iam"
 
+SAMPLE_PATH = "data/iam/parsed/a01-007z-07.json"
+OUTPUT_HTR_SCRIBE = FIGURES_DIR / "attn_htr_scribe.pdf"
+OUTPUT_HTR_TEXT = FIGURES_DIR / "attn_htr_text.pdf"
+OUTPUT_HTR_SFT_SCRIBE = FIGURES_DIR / "attn_htr_sft_scribe.pdf"
 BOS_TOKEN = "<s>"
 EOS_TOKEN = "</s>"
 SPACE_TOKEN = "␣"
@@ -110,16 +113,27 @@ def patch_model(model: HTRModel, capture: AttentionCapture) -> None:
         mha.forward = _make_patched_forward(mha, layer_idx, capture)  # type: ignore[assignment]
 
 
-def average_attention(step_weights: list[list[torch.Tensor]]) -> list[np.ndarray]:
-    """Average attention across all layers and heads for each decode step.
+def rollout_attention(step_weights: list[list[torch.Tensor]]) -> list[np.ndarray]:
+    """Attention rollout across decoder layers (Abnar & Zuidema, 2020).
+
+    During cached autoregressive decoding we only have the query token's
+    attention row at each layer, not the full NxN matrix.  We approximate
+    rollout by iteratively blending each layer's head-averaged attention
+    with the previous rollout via the residual connection:
+
+        r_0 = a_0
+        r_l = 0.5 * a_l + 0.5 * r_{l-1}   (renormalised)
 
     Returns list of 1D arrays, one per step, shape (kv_len,).
     """
     distributions: list[np.ndarray] = []
     for layer_ws in step_weights:
-        per_layer = [w.squeeze(0).squeeze(1) for w in layer_ws]
-        avg = torch.stack(per_layer).mean(dim=(0, 1)).numpy()
-        distributions.append(avg)
+        per_layer = [w.squeeze(0).squeeze(1).mean(dim=0) for w in layer_ws]
+        rollout = per_layer[0]
+        for attn in per_layer[1:]:
+            rollout = 0.5 * attn + 0.5 * rollout
+            rollout = rollout / rollout.sum()
+        distributions.append(rollout.numpy())
     return distributions
 
 
@@ -433,9 +447,10 @@ def _teacher_forced_decode(
 
 def run_model(
     repr_id: TokeniserId,
+    task: Task = Task.HTR,
 ) -> tuple[list[np.ndarray], list[list[list[int]]], list[np.ndarray], int, str]:
     """Load model, run teacher-forced inference, return ink + mapping + attention."""
-    model_id = ModelId(task=Task.HTR, repr_id=repr_id)
+    model_id = ModelId(task=task, repr_id=repr_id)
     model = ModelFactory.load_pretrained(model_id)
     model.eval()
     assert isinstance(model, HTRModel)
@@ -444,9 +459,8 @@ def run_model(
     capture = AttentionCapture(num_layers)
     patch_model(model, capture)
 
-    _, _, test_loader = create_dataloaders(model_id, num_workers=0, persistent_workers=False)
-    batch = next(iter(test_loader))
-    instance = batch.instances[0].to_device()
+    parsed = Parsed.from_path(SAMPLE_PATH)
+    instance = Instance.from_parsed(parsed, repr_id=repr_id).to_device()
 
     ink_len = instance.repr.shape[0]
 
@@ -462,7 +476,22 @@ def run_model(
     strokes, point_bpe = build_ink_and_mapping(repr_id, ink_ids)
 
     # Compute per-step attention distributions
-    distributions = average_attention(capture.step_weights)
+    distributions = rollout_attention(capture.step_weights)
+
+    # Print percentage of attention on ink vs text tokens
+    ink_pcts, bos_pcts, eos_pcts = [], [], []
+    for d in distributions:
+        total = d.sum()
+        ink_pcts.append(d[:ink_len].sum() / total * 100)
+        bos_pcts.append(d[0] / total * 100)
+        eos_pcts.append(d[ink_len - 1] / total * 100)
+    mean_ink = np.mean(ink_pcts)
+    mean_bos = np.mean(bos_pcts)
+    mean_eos = np.mean(eos_pcts)
+    n = len(distributions)
+    print(f"  Attention split (avg over {n} steps):")
+    print(f"    ink={mean_ink:.1f}%  text={100 - mean_ink:.1f}%")
+    print(f"    ink BOS={mean_bos:.1f}%  ink EOS={mean_eos:.1f}%")
 
     return strokes, point_bpe, distributions, ink_len, text
 
@@ -633,31 +662,45 @@ def save_table(
     has_dots = len(dot_coords) > 0
 
     # Colormap and scale
-    cmap = plt.get_cmap("viridis")
-    if distributions:
-        all_ink_attns = np.concatenate([d[:ink_len] for d in distributions])
-    else:
-        all_ink_attns = np.array([0.0])
-    clim_max = max(float(np.percentile(all_ink_attns, 90)), 1e-8)
+    cmap = plt.get_cmap("Reds")
 
-    # Layout: completion prefix, target char, ink attention
+    # Normalize each step's attention to [0, 1]
+    normalized_distributions: list[np.ndarray] = []
+    for d in distributions:
+        ink_attn = d[:ink_len]
+        d_min = ink_attn.min()
+        d_max = ink_attn.max()
+        if d_max - d_min > 1e-12:
+            normed = (d - d_min) / (d_max - d_min)
+        else:
+            normed = np.zeros_like(d)
+        normalized_distributions.append(normed)
+    distributions = normalized_distributions
+    clim_max = 1.0
+
+    # Layout: derive column widths from content
     row_height = 0.7
-    ink_width = 6.2
-    target_char_width = 0.9
+    ink_aspect = (x_max - x_min + 2 * x_pad) / max(y_max - y_min + 2 * y_pad, 1e-6)
+    ink_width = row_height * ink_aspect
+    ink_width = max(3.0, min(8.0, ink_width))  # clamp to reasonable range
+    target_char_width = 0.5
     completion_chars = len(BOS_TOKEN) + max(len(text), 1)
-    completion_width = max(3.2, min(8.0, 0.12 * completion_chars))
+    completion_width = max(2.0, min(6.0, 0.12 * completion_chars))
     fig_width = completion_width + target_char_width + ink_width
     fig_height = row_height * n_rows
 
-    fig, axes = plt.subplots(
+    fig = plt.figure(figsize=(fig_width, fig_height))
+    gs = fig.add_gridspec(
         n_rows,
         3,
-        figsize=(fig_width, fig_height),
-        gridspec_kw={"width_ratios": [completion_width, target_char_width, ink_width]},
+        width_ratios=[completion_width, target_char_width, ink_width],
+        hspace=0.06,
+        wspace=0.3,
     )
-    if n_rows == 1:
-        assert isinstance(axes, np.ndarray)
-        axes = axes.reshape(1, 3)
+    axes = np.empty((n_rows, 3), dtype=object)
+    for r in range(n_rows):
+        for c in range(3):
+            axes[r, c] = fig.add_subplot(gs[r, c])
 
     for row in range(n_rows):
         ax_completion = axes[row, 0]
@@ -665,9 +708,9 @@ def save_table(
         ax_ink = axes[row, 2]
 
         if row == 0:
-            ax_completion.set_title("Prefix", fontsize=10, pad=6)
-            ax_char.set_title("Target", fontsize=10, pad=6)
-            ax_ink.set_title("Ink Attention", fontsize=10, pad=6)
+            ax_completion.set_title("Prefix", fontsize=10, fontweight="bold", pad=6)
+            ax_char.set_title("Target", fontsize=10, fontweight="bold", pad=6)
+            ax_ink.set_title("Ink Attention", fontsize=10, fontweight="bold", pad=6)
 
         # Completion prefix
         completion = text[: min(row, len(text))]
@@ -698,7 +741,7 @@ def save_table(
         ax_ink.set_xlim(x_min - x_pad, x_max + x_pad)
         ax_ink.set_ylim(y_min - y_pad, y_max + y_pad)
         ax_ink.invert_yaxis()
-        ax_ink.set_aspect("equal", adjustable="datalim")
+        ax_ink.set_aspect("equal", adjustable="box")
         ax_ink.axis("off")
 
         # Compute attention colors for this step
@@ -738,23 +781,6 @@ def save_table(
                 edgecolors="none",
             )
 
-    fig.subplots_adjust(hspace=0.06, wspace=0.05)
-
-    # Colorbar spanning all three columns above the column titles
-    cbar_sm = plt.cm.ScalarMappable(norm=Normalize(vmin=0, vmax=clim_max), cmap=cmap)
-    cbar_sm.set_array([])
-    pos_left = axes[0, 0].get_position()
-    pos_right = axes[0, 2].get_position()
-    cbar_height = 0.006
-    cbar_bottom = pos_left.y1 + 0.02
-    cbar_ax = fig.add_axes((pos_left.x0, cbar_bottom, pos_right.x1 - pos_left.x0, cbar_height))
-    cbar = fig.colorbar(cbar_sm, cax=cbar_ax, orientation="horizontal")
-    cbar.ax.set_xlim(0, clim_max)
-    cbar.ax.xaxis.set_ticks_position("top")
-    cbar.ax.xaxis.set_label_position("top")
-    cbar.ax.tick_params(labelsize=7, length=2, pad=2)
-    getattr(cbar.outline, "set_linewidth")(0.4)
-
     fig.savefig(output_path, bbox_inches="tight", dpi=300)
     plt.close(fig)
     print(f"  Saved {output_path}")
@@ -763,28 +789,17 @@ def save_table(
 def main() -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("=== ScribeTokens ===")
-    s_strokes, s_bpe, s_dists, s_ink_len, s_text = run_model(TokeniserId.create_scribe())
-    save_table(
-        s_strokes,
-        s_bpe,
-        s_dists,
-        s_ink_len,
-        s_text,
-        str(FIGURES_DIR / "attention_scribe.pdf"),
-    )
+    configs = [
+        ("HTR ScribeTokens", TokeniserId.create_scribe(), Task.HTR, OUTPUT_HTR_SCRIBE),
+        ("HTR TextTokens", TokeniserId.create_text(), Task.HTR, OUTPUT_HTR_TEXT),
+        ("HTR_SFT ScribeTokens", TokeniserId.create_scribe(), Task.HTR_SFT, OUTPUT_HTR_SFT_SCRIBE),
+    ]
 
-    print()
-    print("=== TextTokens ===")
-    t_strokes, t_bpe, t_dists, t_ink_len, t_text = run_model(TokeniserId.create_text())
-    save_table(
-        t_strokes,
-        t_bpe,
-        t_dists,
-        t_ink_len,
-        t_text,
-        str(FIGURES_DIR / "attention_text.pdf"),
-    )
+    for label, repr_id, task, output_path in configs:
+        print(f"=== {label} ===")
+        strokes, bpe, dists, ink_len, text = run_model(repr_id, task)
+        save_table(strokes, bpe, dists, ink_len, text, str(output_path))
+        print()
 
 
 if __name__ == "__main__":

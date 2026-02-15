@@ -14,6 +14,9 @@ from matplotlib.axes import Axes
 
 from schemas.ink import DigitalInk, Point, Stroke
 
+SAMPLE_PATH = "data/iam/parsed/a01-007z-07.json"
+OUTPUT_PATH = Path("output/figures/discretization.pdf")
+
 
 def load_ink_from_json(path: str) -> DigitalInk:
     """Load an IAM ink JSON file into a DigitalInk object."""
@@ -61,11 +64,9 @@ def plot_ink(ax: Axes, ink: DigitalInk):
 
 
 def main():
-    data_dir = Path("data/iam/parsed")
-    out_dir = Path("output/figures")
-    out_dir.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    ink = load_ink_from_json(str(data_dir / "a01-007z-07.json"))
+    ink = load_ink_from_json(SAMPLE_PATH)
 
     deltas = [1, 2, 4, 8, 16, 32, 64, 128]
     nrows = len(deltas)
@@ -74,8 +75,8 @@ def main():
     # --- Matplotlib rcParams for publication style ---
     plt.rcParams.update(
         {
-            "font.family": "serif",
-            "mathtext.fontset": "stix",
+            "font.family": "sans-serif",
+            "mathtext.fontset": "dejavusans",
             "font.size": 10,
         }
     )
@@ -93,8 +94,8 @@ def main():
     y_pad = (ymax - ymin) * 0.05
 
     # Column titles
-    axes[0, 0].set_title("Quantized", fontsize=11)
-    axes[0, 1].set_title("Quantized + Smoothed", fontsize=11)
+    axes[0, 0].set_title("Quantized", fontsize=10, fontweight="bold")
+    axes[0, 1].set_title("Quantized + Smoothed", fontsize=10, fontweight="bold")
 
     for row_idx, delta in enumerate(deltas):
         # Left column: raw quantized
@@ -123,7 +124,7 @@ def main():
         if delta == 8:
             axes[row_idx, 0].set_ylabel(
                 label,
-                fontsize=11,
+                fontsize=10,
                 fontweight="bold",
                 color="#2e7d32",
                 rotation=0,
@@ -133,18 +134,14 @@ def main():
         else:
             axes[row_idx, 0].set_ylabel(
                 label,
-                fontsize=11,
+                fontsize=10,
                 rotation=0,
                 labelpad=30,
                 va="center",
             )
 
-    fig.savefig(
-        out_dir / "discretization.pdf",
-        bbox_inches="tight",
-        dpi=300,
-    )
-    print(f"Saved figure to {out_dir / 'discretization.pdf'}")
+    fig.savefig(OUTPUT_PATH, bbox_inches="tight", dpi=300)
+    print(f"Saved {OUTPUT_PATH}")
     plt.close(fig)
 
 

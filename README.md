@@ -81,6 +81,7 @@ make <target>
 | `train-test` | Quick test run (`--all --test`) |
 | `train-parallel` | Runs `scripts/train/parallel.sh` |
 | `eval` | Evaluates all supported tasks (`scripts.eval.main --all`) |
+| `plot` | Generates all figures (`output/figures/`) and tables (`output/tables/`) |
 | `kill` | Kills processes matching `scribe-tokens` |
 | `check-cuda` | Prints CUDA availability/device via PyTorch |
 | `setup-lambda` | Runs Lambda-specific environment setup script |

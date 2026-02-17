@@ -23,6 +23,16 @@ train-parallel:
 eval:
 	.venv/bin/python -m scripts.eval.main --all
 
+# --- Plotting ---
+plot:
+	.venv/bin/python -m scripts.plot.compression
+	.venv/bin/python -m scripts.plot.oov
+	.venv/bin/python -m scripts.plot.discretization
+	.venv/bin/python -m scripts.plot.double_descent
+	.venv/bin/python -m scripts.plot.attention
+	.venv/bin/python -m scripts.plot.convergence
+	.venv/bin/python -m scripts.plot.results
+
 # --- Utilities ---
 kill:
 	pgrep -f scribe-tokens | xargs kill -9

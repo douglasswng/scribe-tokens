@@ -644,7 +644,7 @@ def save_table(
         {
             "font.family": "sans-serif",
             "mathtext.fontset": "dejavusans",
-            "font.size": 10,
+            "font.size": 8,
         }
     )
 
@@ -679,7 +679,7 @@ def save_table(
     clim_max = 1.0
 
     # Layout: derive column widths from content
-    row_height = 0.7
+    row_height = 0.3
     ink_aspect = (x_max - x_min + 2 * x_pad) / max(y_max - y_min + 2 * y_pad, 1e-6)
     ink_width = row_height * ink_aspect
     ink_width = max(3.0, min(8.0, ink_width))  # clamp to reasonable range
@@ -694,8 +694,8 @@ def save_table(
         n_rows,
         3,
         width_ratios=[completion_width, target_char_width, ink_width],
-        hspace=0.06,
-        wspace=0.3,
+        hspace=0.01,
+        wspace=0,
     )
     axes = np.empty((n_rows, 3), dtype=object)
     for r in range(n_rows):
@@ -708,9 +708,9 @@ def save_table(
         ax_ink = axes[row, 2]
 
         if row == 0:
-            ax_completion.set_title("Prefix", fontsize=10, fontweight="bold", pad=6)
-            ax_char.set_title("Target", fontsize=10, fontweight="bold", pad=6)
-            ax_ink.set_title("Ink Attention", fontsize=10, fontweight="bold", pad=6)
+            ax_completion.set_title("Prefix", fontsize=10, pad=6)
+            ax_char.set_title("Target", fontsize=10, pad=6)
+            ax_ink.set_title("Ink Attention", fontsize=10, pad=6)
 
         # Completion prefix
         completion = text[: min(row, len(text))]
@@ -760,7 +760,9 @@ def save_table(
             lc = LineCollection(
                 all_segs_arr.tolist(),
                 cmap=cmap,
-                linewidths=1.5,
+                linewidths=1.0,
+                capstyle="round",
+                joinstyle="round",
             )
             lc.set_array(flat)
             lc.set_clim(0, clim_max)

@@ -2,8 +2,8 @@
 Convert evaluation CSV results to LaTeX tables.
 
 Usage:
-  python -m scripts.eval.tables
-  python -m scripts.eval.tables --task HTR
+  python -m scripts.plot.results
+  python -m scripts.plot.results --task HTR
 """
 
 import argparse
@@ -241,10 +241,11 @@ def csv_to_latex(csv_path: Path, output_path: Path) -> str:
 
 def main(task: str | None = None) -> None:
     """Generate LaTeX tables from CSV results."""
+    TASK_CSVS = {"htr", "htg"}
     if task:
         csv_files = [RESULTS_DIR / f"{task.lower()}.csv"]
     else:
-        csv_files = list(RESULTS_DIR.glob("*.csv"))
+        csv_files = [f for f in RESULTS_DIR.glob("*.csv") if f.stem in TASK_CSVS]
 
     for csv_path in csv_files:
         if not csv_path.exists():

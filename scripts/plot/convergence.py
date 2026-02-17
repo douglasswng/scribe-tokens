@@ -126,7 +126,7 @@ def format_repr_name(repr_name: str) -> str:
 
 
 def _format_dataset_cells(r, best_speedup: float | None) -> list[str]:
-    """Format the 4 data cells (PT Ep., No PT, +PT, Speedup) for one dataset."""
+    """Format the 4 data cells (PT Ep., No PT, +PT, Spd.) for one dataset."""
     parts = []
     parts.append(str(int(r["pt_epochs"])) if pd.notna(r["pt_epochs"]) else "--")
     parts.append(str(int(r["base_conv"])))
@@ -186,7 +186,7 @@ def to_latex(task_summary: pd.DataFrame) -> str:
     # Sub-header
     sub = ["Method"]
     for _ in DATASET_ORDER:
-        sub.extend(["PT Ep.", "No PT", "+PT", "Speedup"])
+        sub.extend(["PT Ep.", "No PT", "+PT", "Spd."])
     lines.append(" & ".join(sub) + " \\\\")
     lines.append("\\midrule")
 

@@ -77,15 +77,15 @@ def main():
         {
             "font.family": "sans-serif",
             "mathtext.fontset": "dejavusans",
-            "font.size": 10,
+            "font.size": 8,
         }
     )
 
     fig, axes = plt.subplots(
         nrows,
         ncols,
-        figsize=(7, 7),
-        gridspec_kw={"hspace": 0.05, "wspace": 0.02},
+        figsize=(5.5, 3.6),
+        gridspec_kw={"hspace": 0.01, "wspace": 0},
     )
 
     # Bounding box from the original ink for consistent limits
@@ -94,8 +94,8 @@ def main():
     y_pad = (ymax - ymin) * 0.05
 
     # Column titles
-    axes[0, 0].set_title("Quantized", fontsize=10, fontweight="bold")
-    axes[0, 1].set_title("Quantized + Smoothed", fontsize=10, fontweight="bold")
+    axes[0, 0].set_title("Quantized", fontsize=10)
+    axes[0, 1].set_title("Postprocessed", fontsize=10)
 
     for row_idx, delta in enumerate(deltas):
         # Left column: raw quantized
@@ -124,7 +124,7 @@ def main():
         if delta == 8:
             axes[row_idx, 0].set_ylabel(
                 label,
-                fontsize=10,
+                fontsize=9,
                 fontweight="bold",
                 color="#2e7d32",
                 rotation=0,
@@ -134,7 +134,7 @@ def main():
         else:
             axes[row_idx, 0].set_ylabel(
                 label,
-                fontsize=10,
+                fontsize=9,
                 rotation=0,
                 labelpad=30,
                 va="center",

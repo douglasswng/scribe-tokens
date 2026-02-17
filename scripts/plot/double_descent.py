@@ -46,11 +46,11 @@ def main() -> None:
         {
             "font.family": "sans-serif",
             "mathtext.fontset": "dejavusans",
-            "font.size": 12,
+            "font.size": 8,
         }
     )
 
-    fig, ax = plt.subplots(figsize=(5, 3.5))
+    fig, ax = plt.subplots(figsize=(3.25, 2.0))
 
     for repr_name, (label, colour) in REPR_STYLE.items():
         subset = cast(pd.DataFrame, df[df["repr"] == repr_name]).sort_values("epoch")
@@ -64,9 +64,9 @@ def main() -> None:
             linewidth=1.5,
         )
 
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Validation Cross-Entropy Loss")
-    ax.legend(frameon=False, fontsize=10)
+    ax.set_xlabel("Epoch", fontsize=9)
+    ax.set_ylabel("Validation Cross-Entropy Loss", fontsize=9)
+    ax.legend(frameon=False, fontsize=8)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 

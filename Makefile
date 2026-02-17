@@ -41,8 +41,7 @@ check-cuda:
 	source .venv/bin/activate
 	.venv/bin/python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
 
-setup-lambda:
-	bash scripts/utils/setup_lambda.sh
-
 tmux:
 	tmux new-session -A -s train
+
+-include local.mk

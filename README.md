@@ -2,6 +2,8 @@
 
 Implementation and experiment pipeline for **ScribeTokens**, the digital-ink tokenization proposed in the paper.
 
+📄 [Paper (PDF)](docs/paper.pdf)
+
 ScribeTokens represents pen trajectories with a fixed base vocabulary of 10 tokens:
 - 8 directional unit-step tokens (Freeman-style chain directions)
 - 2 pen-state tokens (`[DOWN]`, `[UP]`)

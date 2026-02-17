@@ -10,3 +10,6 @@ __pycache__
 *.ipynb
 *.pt
 *.zip
+
+local.mk
+/scripts/local/

@@ -4,7 +4,8 @@ __pycache__
 
 /archive/
 /artifacts/
-/data/
+/data/*/raw/
+/data/*/parsed/
 /tmp/
 
 *.ipynb

@@ -44,6 +44,11 @@ OUTPUT_HTR_SFT_SCRIBE = FIGURES_DIR / "attn_htr_sft_scribe.pdf"
 BOS_TOKEN = "<s>"
 EOS_TOKEN = "</s>"
 SPACE_TOKEN = "␣"
+INK_LINE_WIDTH = 0.7
+DOT_MARKER_SIZE = 1.0
+LINE_CAPSTYLE = "projecting"
+LINE_JOINSTYLE = "round"
+SMOOTH_STROKES = True
 
 
 class AttentionCapture:
@@ -156,7 +161,7 @@ def _split_bpe_tokens(tokeniser: Tokeniser, token_ids: list[int]) -> tuple[list[
 
 def _trace_scribe(
     atomic: list[object], atomic_to_bpe: list[int], delta: float
-) -> tuple[list[np.ndarray], list[list[list[int]]]]:
+) -> tuple[list[np.ndarray], list[list[list[int]]], dict[int, int]]:
     """Replay ScribeTokeniser.detokenise with BPE index tracking.
 
     Returns:
@@ -166,38 +171,58 @@ def _trace_scribe(
     """
     current = np.array([0.0, 0.0])
     strokes: list[list[np.ndarray]] = [[current.copy()]]
-    point_bpe: list[list[list[int]]] = [[[]]]  # initial point has no token
+    point_bpe: list[list[list[int]]] = [[[]]]
     pen = "down"
+    last_visible_bpe: int | None = None
+    redirect_to_visible: dict[int, int] = {}
+
+    def redirect_hidden_to_visible(bpe: int) -> None:
+        if last_visible_bpe is None:
+            return
+        redirect_to_visible[bpe] = last_visible_bpe
 
     for i, tok in enumerate(atomic):
         bpe = atomic_to_bpe[i]
         if isinstance(tok, SpecialToken):
+            redirect_hidden_to_visible(bpe)
             if tok.type == SpecialTokenType.START:
                 continue
             elif tok.type == SpecialTokenType.END:
                 break
+            elif tok.type == SpecialTokenType.UP and pen == "up":
+                continue
+            elif tok.type == SpecialTokenType.DOWN and pen == "down":
+                continue
             elif tok.type == SpecialTokenType.UP and pen == "down":
                 pen = "up"
             elif tok.type == SpecialTokenType.DOWN and pen == "up":
                 pen = "down"
                 strokes.append([current.copy()])
                 point_bpe.append([[]])
+            else:
+                raise ValueError(f"Unknown token: {tok}")
         elif isinstance(tok, RegularToken):
             assert isinstance(tok.values, str)
+            if pen == "up":
+                # Pen-up motion is not visible; attribute to the latest visible ink.
+                redirect_hidden_to_visible(bpe)
             dx, dy = STR_TO_COORD[tok.values]
             current = current + np.array([float(dx), float(dy)])
             if pen == "down":
                 strokes[-1].append(current.copy())
                 point_bpe[-1].append([bpe])
+                last_visible_bpe = bpe
+        else:
+            raise ValueError(f"Unknown token: {tok}")
 
     # Scale and convert to arrays
     scaled = [np.array(s) * delta for s in strokes]
-    return scaled, point_bpe
+    return scaled, point_bpe, redirect_to_visible
 
 
 def _trace_text(
     atomic: list[object], atomic_to_bpe: list[int], delta: float
-) -> tuple[list[np.ndarray], list[list[list[int]]]]:
+) -> tuple[list[np.ndarray], list[list[list[int]]], dict[int, int]]:
     """Replay TextTokeniser.detokenise with BPE index tracking.
 
     Returns same format as _trace_scribe.
@@ -230,10 +255,18 @@ def _trace_text(
     stroke_bpe: list[list[int]] = [[]]
     strokes: list[list[np.ndarray]] = []
     all_point_bpe: list[list[list[int]]] = []
+    last_visible_bpe: int | None = None
+    redirect_to_visible: dict[int, int] = {}
+
+    def redirect_hidden_to_visible(bpe: int) -> None:
+        if last_visible_bpe is None:
+            return
+        redirect_to_visible[bpe] = last_visible_bpe
 
     for kind, val, bpes in hybrid:
         if kind == "special":
             assert isinstance(val, SpecialToken)
+            redirect_hidden_to_visible(bpes[0])
             if val.type == SpecialTokenType.START:
                 continue
             elif val.type == SpecialTokenType.END:
@@ -243,6 +276,8 @@ def _trace_text(
                 all_point_bpe.append(stroke_bpe)
                 stroke_pts = []
                 stroke_bpe = []
+            else:
+                raise ValueError(f"Unknown token: {val}")
         else:
             assert isinstance(val, str)
             # Parse string into coordinate pairs, tracking char→BPE
@@ -274,11 +309,13 @@ def _trace_text(
                     f"bpes of length {len(bpes)} "
                     f"(string={val!r}, parts={parts}, pi={pi})"
                 )
-                point_bpes = list(set(bpes[start:end]))
+                point_bpes = list(dict.fromkeys(bpes[start:end]))
 
                 current = current + np.array([float(x), float(y)])
                 stroke_pts.append(current.copy())
                 stroke_bpe.append(point_bpes)
+                if point_bpes:
+                    last_visible_bpe = point_bpes[-1]
 
     # Handle any remaining stroke
     if stroke_pts:
@@ -286,7 +323,7 @@ def _trace_text(
         all_point_bpe.append(stroke_bpe)
 
     scaled = [np.array(s) * delta for s in strokes]
-    return scaled, all_point_bpe
+    return scaled, all_point_bpe, redirect_to_visible
 
 
 def _validate_trace(
@@ -346,12 +383,13 @@ def _validate_trace(
 
 def build_ink_and_mapping(
     repr_id: TokeniserId, ink_token_ids: list[int]
-) -> tuple[list[np.ndarray], list[list[list[int]]]]:
+) -> tuple[list[np.ndarray], list[list[list[int]]], dict[int, int]]:
     """Reconstruct ink and build per-point BPE token index mapping.
 
     Returns:
         strokes: list of (N, 2) coordinate arrays for drawing.
         point_bpe: point_bpe[stroke][point] = list of BPE token indices.
+        redirect_to_visible: hidden-token BPE index -> visible-token BPE index.
     """
     tokeniser = TokeniserFactory.create(repr_id)
     atomic, atomic_to_bpe = _split_bpe_tokens(tokeniser, ink_token_ids)
@@ -360,9 +398,9 @@ def build_ink_and_mapping(
     delta: float = getattr(tokeniser._preprocessor, "_delta")
 
     if isinstance(discrete, ScribeTokeniser):
-        strokes, point_bpe = _trace_scribe(atomic, atomic_to_bpe, delta)
+        strokes, point_bpe, redirect_to_visible = _trace_scribe(atomic, atomic_to_bpe, delta)
     elif isinstance(discrete, TextTokeniser):
-        strokes, point_bpe = _trace_text(atomic, atomic_to_bpe, delta)
+        strokes, point_bpe, redirect_to_visible = _trace_text(atomic, atomic_to_bpe, delta)
     else:
         raise ValueError(f"Unsupported tokeniser type: {type(discrete)}")
 
@@ -375,7 +413,10 @@ def build_ink_and_mapping(
 
     _validate_trace(strokes, point_bpe, ref_ink, len(ink_token_ids), repr_id.type.value)
 
-    # Smooth strokes for nicer rendering (preserves point count)
+    if not SMOOTH_STROKES:
+        return strokes, point_bpe, redirect_to_visible
+
+    # Optional smoothing for presentation-only usage.
     smoothed: list[np.ndarray] = []
     for s in strokes:
         if len(s) >= 7:  # savgol needs window_length <= len
@@ -385,7 +426,7 @@ def build_ink_and_mapping(
         else:
             smoothed.append(s)
 
-    return smoothed, point_bpe
+    return smoothed, point_bpe, redirect_to_visible
 
 
 def _teacher_forced_decode(
@@ -448,7 +489,7 @@ def _teacher_forced_decode(
 def run_model(
     repr_id: TokeniserId,
     task: Task = Task.HTR,
-) -> tuple[list[np.ndarray], list[list[list[int]]], list[np.ndarray], int, str]:
+) -> tuple[list[np.ndarray], list[list[list[int]]], dict[int, int], list[np.ndarray], int, str]:
     """Load model, run teacher-forced inference, return ink + mapping + attention."""
     model_id = ModelId(task=task, repr_id=repr_id)
     model = ModelFactory.load_pretrained(model_id)
@@ -473,7 +514,7 @@ def run_model(
 
     # Build ink and mapping
     ink_ids = instance.repr.tolist()
-    strokes, point_bpe = build_ink_and_mapping(repr_id, ink_ids)
+    strokes, point_bpe, redirect_to_visible = build_ink_and_mapping(repr_id, ink_ids)
 
     # Compute per-step attention distributions
     distributions = rollout_attention(capture.step_weights)
@@ -493,7 +534,7 @@ def run_model(
     print(f"    ink={mean_ink:.1f}%  text={100 - mean_ink:.1f}%")
     print(f"    ink BOS={mean_bos:.1f}%  ink EOS={mean_eos:.1f}%")
 
-    return strokes, point_bpe, distributions, ink_len, text
+    return strokes, point_bpe, redirect_to_visible, distributions, ink_len, text
 
 
 def _is_dot_stroke(stroke: np.ndarray, atol: float = 1e-6) -> bool:
@@ -510,35 +551,51 @@ def _is_dot_stroke(stroke: np.ndarray, atol: float = 1e-6) -> bool:
     return bool(np.max(deltas) <= atol)
 
 
+def _project_token_attention(
+    attn: np.ndarray,
+    ink_len: int,
+    redirect_to_visible: dict[int, int],
+) -> np.ndarray:
+    """Project token attention onto visible tokens with hidden-token redirects."""
+    token_attn = np.zeros(ink_len)
+    for bpe in range(min(len(attn), ink_len)):
+        receiver = redirect_to_visible.get(bpe, bpe)
+        if 0 <= receiver < ink_len:
+            token_attn[receiver] += float(attn[bpe])
+    return token_attn
+
+
 def _compute_segment_attention(
     strokes: list[np.ndarray],
     point_bpe: list[list[list[int]]],
-    attn: np.ndarray,
-    ink_len: int,
+    token_attn: np.ndarray,
 ) -> list[np.ndarray]:
     """For each stroke, compute attention value per line segment.
 
-    A segment connects point[i] to point[i+1]. Its attention is the mean
-    attention of the BPE tokens that produced point[i+1].
+    A segment connects point[i] to point[i+1]. Its attention is the
+    point-attention value at point[i+1], where point-attention is the sum of
+    projected visible-token attention for that point.
     """
     seg_attns: list[np.ndarray] = []
     for s_idx, stroke in enumerate(strokes):
         if _is_dot_stroke(stroke):
             seg_attns.append(np.array([]))
             continue
-        n_segments = len(stroke) - 1
-        if n_segments <= 0:
+        n_points = len(stroke)
+        if n_points <= 1:
             seg_attns.append(np.array([]))
             continue
-        vals = np.zeros(n_segments)
-        for seg_i in range(n_segments):
-            point_i = seg_i + 1  # endpoint of segment
+
+        point_vals = np.zeros(n_points)
+        for point_i in range(n_points):
             bpe_indices = point_bpe[s_idx][point_i]
             if bpe_indices:
-                valid = [b for b in bpe_indices if b < ink_len]
+                valid = [b for b in bpe_indices if b < len(token_attn)]
                 if valid:
-                    vals[seg_i] = np.mean([attn[b] for b in valid])
-        seg_attns.append(vals)
+                    point_vals[point_i] = float(np.sum([token_attn[b] for b in valid]))
+
+        seg_vals = point_vals[1:]
+        seg_attns.append(seg_vals)
     return seg_attns
 
 
@@ -569,15 +626,14 @@ def _get_single_point_strokes(
 
 def _compute_dot_attention(
     dot_bpes: list[list[int]],
-    attn: np.ndarray,
-    ink_len: int,
+    token_attn: np.ndarray,
 ) -> np.ndarray:
     """Compute attention value for each single-point stroke."""
     vals = np.zeros(len(dot_bpes))
     for i, bpes in enumerate(dot_bpes):
-        valid = [b for b in bpes if b < ink_len]
+        valid = [b for b in bpes if b < len(token_attn)]
         if valid:
-            vals[i] = np.mean([attn[b] for b in valid])
+            vals[i] = float(np.sum([token_attn[b] for b in valid]))
     return vals
 
 
@@ -631,6 +687,7 @@ def _draw_completion_prefix(
 def save_table(
     strokes: list[np.ndarray],
     point_bpe: list[list[list[int]]],
+    redirect_to_visible: dict[int, int],
     distributions: list[np.ndarray],
     ink_len: int,
     text: str,
@@ -749,7 +806,8 @@ def save_table(
             attn = np.array([])
         else:
             attn = distributions[min(row, n_attn_steps - 1)]
-        seg_attns = _compute_segment_attention(strokes, point_bpe, attn, ink_len)
+        token_attn = _project_token_attention(attn, ink_len, redirect_to_visible)
+        seg_attns = _compute_segment_attention(strokes, point_bpe, token_attn)
         if n_total_segments > 0:
             flat = np.zeros(n_total_segments)
             for s_idx, sa in enumerate(seg_attns):
@@ -760,9 +818,9 @@ def save_table(
             lc = LineCollection(
                 all_segs_arr.tolist(),
                 cmap=cmap,
-                linewidths=1.0,
-                capstyle="round",
-                joinstyle="round",
+                linewidths=INK_LINE_WIDTH,
+                capstyle=LINE_CAPSTYLE,
+                joinstyle=LINE_JOINSTYLE,
             )
             lc.set_array(flat)
             lc.set_clim(0, clim_max)
@@ -770,7 +828,7 @@ def save_table(
 
         # Render dot-like strokes
         if has_dots:
-            dot_attns = _compute_dot_attention(dot_bpes, attn, ink_len)
+            dot_attns = _compute_dot_attention(dot_bpes, token_attn)
             ax_ink.scatter(
                 dot_coords[:, 0],
                 dot_coords[:, 1],
@@ -778,7 +836,7 @@ def save_table(
                 cmap=cmap,
                 vmin=0,
                 vmax=clim_max,
-                s=4,
+                s=DOT_MARKER_SIZE,
                 zorder=5,
                 edgecolors="none",
             )
@@ -799,8 +857,8 @@ def main() -> None:
 
     for label, repr_id, task, output_path in configs:
         print(f"=== {label} ===")
-        strokes, bpe, dists, ink_len, text = run_model(repr_id, task)
-        save_table(strokes, bpe, dists, ink_len, text, str(output_path))
+        strokes, bpe, redirect, dists, ink_len, text = run_model(repr_id, task)
+        save_table(strokes, bpe, redirect, dists, ink_len, text, str(output_path))
         print()
 
 

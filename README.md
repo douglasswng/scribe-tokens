@@ -178,6 +178,7 @@ make <target>
 | `plot-attention` | Attention visualization figure(s) only |
 | `plot-convergence` | Convergence speedup table only |
 | `plot-results` | Result CSV to LaTeX tables only |
+| `plot-scribe` | Scribe token visualization figure only |
 | **Utilities** | |
 | `move-checkpoints` | Move best checkpoint weights into `models/` |
 | `fetch-metrics` | Fetch SwanLab run metrics to CSV |
@@ -289,6 +290,7 @@ make plot-double-descent
 make plot-attention
 make plot-convergence
 make plot-results
+make plot-scribe
 
 # Results table for one task
 uv run -m scripts.plot.results --task HTR

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Generate discretization artifacts figure for the paper.
 
 Shows how quantization parameter δ affects digital ink reconstruction quality,
@@ -7,15 +6,15 @@ comparing raw quantized output (left column) with postprocessed/smoothed output
 """
 
 import json
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
+from constants import FIGURES_DIR
 from schemas.ink import DigitalInk, Point, Stroke
 
 SAMPLE_PATH = "data/iam/parsed/a01-007z-07.json"
-OUTPUT_PATH = Path("output/figures/discretization.pdf")
+OUTPUT_PATH = FIGURES_DIR / "discretization.pdf"
 
 
 def load_ink_from_json(path: str) -> DigitalInk:
@@ -52,7 +51,7 @@ def get_bounding_box(ink: DigitalInk) -> tuple[float, float, float, float]:
     return min(all_x), max(all_x), min(all_y), max(all_y)
 
 
-def plot_ink(ax: Axes, ink: DigitalInk):
+def plot_ink(ax: Axes, ink: DigitalInk) -> None:
     """Plot ink strokes on an axes."""
     for stroke in ink.strokes:
         xs = [pt.x for pt in stroke.points]
@@ -63,7 +62,7 @@ def plot_ink(ax: Axes, ink: DigitalInk):
             ax.plot(xs, ys, "-k", linewidth=1.0)
 
 
-def main():
+def main() -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     ink = load_ink_from_json(SAMPLE_PATH)
@@ -72,7 +71,6 @@ def main():
     nrows = len(deltas)
     ncols = 2  # left: raw quantized, right: postprocessed
 
-    # --- Matplotlib rcParams for publication style ---
     plt.rcParams.update(
         {
             "font.family": "sans-serif",

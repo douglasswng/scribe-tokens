@@ -65,6 +65,7 @@ plot:
 	$(PYTHON) -m scripts.plot.attention
 	$(PYTHON) -m scripts.plot.convergence
 	$(PYTHON) -m scripts.plot.results
+	$(PYTHON) -m scripts.plot.scribe
 
 plot-compression:
 	$(PYTHON) -m scripts.plot.compression
@@ -86,6 +87,9 @@ plot-convergence:
 
 plot-results:
 	$(PYTHON) -m scripts.plot.results
+
+plot-scribe:
+	$(PYTHON) -m scripts.plot.scribe
 
 # --- Utilities ---
 move-checkpoints:

@@ -1,3 +1,13 @@
+"""OOV rate vs vocabulary size for each tokeniser type.
+
+Loads results from the OOV CSV and generates a publication-quality PDF
+with one subplot per tokeniser type, showing out-of-vocabulary rate across
+vocabulary sizes and δ values.
+
+Usage:
+  python -m scripts.plot.oov
+"""
+
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -11,15 +21,17 @@ from constants import FIGURES_DIR, RESULTS_DIR
 RESULT_PATH = RESULTS_DIR / "oov.csv"
 FIGURE_PATH = FIGURES_DIR / "oov.pdf"
 
+OURS = "ScribeTokens"
+
 
 def load_data(file_path: Path = RESULT_PATH) -> pd.DataFrame:
     return pd.read_csv(file_path)
 
 
-def _setup_subplot_grid(n_tokenizers: int, figsize: tuple[float, float]) -> tuple[Figure, list]:
-    """Set up the subplot grid based on number of tokenizers."""
+def _setup_subplot_grid(n_tokenisers: int, figsize: tuple[float, float]) -> tuple[Figure, list]:
+    """Set up the subplot grid based on number of tokenisers."""
     cols = 2
-    rows = (n_tokenizers + 1) // 2
+    rows = (n_tokenisers + 1) // 2
     fig, axes = plt.subplots(rows, cols, figsize=figsize, sharex=True, sharey=True)
 
     # Always convert to a flat list for consistent indexing
@@ -32,14 +44,14 @@ def _setup_subplot_grid(n_tokenizers: int, figsize: tuple[float, float]) -> tupl
     return fig, axes
 
 
-def _plot_tokenizer_data(
-    ax: Axes, tokenizer_data: pd.DataFrame, tokenizer_type: str, colors: list
+def _plot_tokeniser_data(
+    ax: Axes, tokeniser_data: pd.DataFrame, tokeniser_type: str, colors: list
 ) -> None:
-    """Plot data for a single tokenizer type on the given axis."""
-    deltas = sorted(tokenizer_data["delta"].unique(), reverse=True)
+    """Plot data for a single tokeniser type on the given axis."""
+    deltas = sorted(tokeniser_data["delta"].unique(), reverse=True)
 
     for j, delta in enumerate(deltas):
-        delta_data: pd.DataFrame = tokenizer_data[tokenizer_data["delta"] == delta].sort_values(
+        delta_data: pd.DataFrame = tokeniser_data[tokeniser_data["delta"] == delta].sort_values(
             "vocab_size"
         )  # type: ignore[call-overload]
 
@@ -52,18 +64,18 @@ def _plot_tokenizer_data(
             markersize=3,
             linewidth=1.5,
         )
-
-    ax.set_title(f"{tokenizer_type}", fontsize=10)
+    suffix = " (Ours)" if tokeniser_type == OURS else ""
+    ax.set_title(f"{tokeniser_type}{suffix}", fontsize=10)
     ax.grid(True, alpha=0.2)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.tick_params(axis="both", which="major", labelsize=8)
 
 
-def _finalize_plot_layout(fig: Figure, axes: list, n_tokenizers: int, cols: int = 2) -> None:
+def _finalize_plot_layout(fig: Figure, axes: list, n_tokenisers: int) -> None:
     """Hide unused subplots and add axis labels."""
     # Hide unused subplots
-    for i in range(n_tokenizers, len(axes)):
+    for i in range(n_tokenisers, len(axes)):
         axes[i].set_visible(False)
 
     fig.supxlabel("Vocabulary Size (k)", fontsize=9)
@@ -79,21 +91,21 @@ def create_oov_plot(df: pd.DataFrame, figsize: tuple[float, float] = (5.5, 1.8))
         }
     )
 
-    tokenizer_types = df["tokeniser_type"].unique()
-    n_tokenizers = len(tokenizer_types)
+    tokeniser_types = df["tokeniser_type"].unique()
+    n_tokenisers = len(tokeniser_types)
 
-    fig, axes = _setup_subplot_grid(n_tokenizers, figsize)
+    fig, axes = _setup_subplot_grid(n_tokenisers, figsize)
     fig.set_layout_engine("constrained")
     colors = plt.colormaps["viridis"](np.linspace(0, 1.0, 6))
 
-    for i, tokenizer_type in enumerate(tokenizer_types):
-        tokenizer_data: pd.DataFrame = df[df["tokeniser_type"] == tokenizer_type]  # type: ignore[assignment]
-        _plot_tokenizer_data(axes[i], tokenizer_data, tokenizer_type, list(colors))
+    for i, tokeniser_type in enumerate(tokeniser_types):
+        tokeniser_data: pd.DataFrame = df[df["tokeniser_type"] == tokeniser_type]  # type: ignore[assignment]
+        _plot_tokeniser_data(axes[i], tokeniser_data, tokeniser_type, list(colors))
 
-    _finalize_plot_layout(fig, axes, n_tokenizers)
+    _finalize_plot_layout(fig, axes, n_tokenisers)
 
-    # Shared legend from first subplot's handles
-    handles, labels = axes[n_tokenizers - 1].get_legend_handles_labels()
+    # Shared legend from last subplot's handles
+    handles, labels = axes[n_tokenisers - 1].get_legend_handles_labels()
     fig.legend(handles, labels, loc="outside right center", ncols=1, fontsize=8)
 
     return fig

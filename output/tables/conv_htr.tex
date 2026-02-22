@@ -1,13 +1,15 @@
-\begin{tabular}{l cccc cccc}
+\begin{tabular}{l
+  S[table-format=2] S[table-format=3] S[table-format=2] S[table-format=2.1, table-space-text-post=$\times$]
+  S[table-format=3] S[table-format=2] S[table-format=1] S[table-format=1.1, table-space-text-post=$\times$]}
 \toprule
  & \multicolumn{4}{c}{IAM} & \multicolumn{4}{c}{DeepWriting} \\
 \cmidrule(lr){2-5} \cmidrule(lr){6-9}
-Method & PT Ep. & No PT & +PT & Spd. & PT Ep. & No PT & +PT & Spd. \\
+Method & {PT Ep.} & {No PT} & {+PT} & {Spd.} & {PT Ep.} & {No PT} & {+PT} & {Spd.} \\
 \midrule
-Point-5 & 36 & 171 & -- & -- & 55 & 13 & -- & -- \\
-RelTokens & 72 & 193 & 13 & 14.8$\times$ & 99 & 23 & 9 & 2.6$\times$ \\
-TextTokens & 99 & 18 & 6 & 3.0$\times$ & 100 & 30 & 6 & \textbf{5.0$\times$} \\
+Point-5 & 36 & 171 & {--} & {--} & 55 & 13 & {--} & {--} \\
+RelTokens & 72 & 193 & 13 & 14.8 $\times$ & 99 & 23 & 9 & 2.6 $\times$ \\
+TextTokens & 99 & 18 & 6 & 3.0 $\times$ & 100 & 30 & 6 & \bfseries 5.0 $\times$ \\
 \midrule
-ScribeTokens (Ours) & 90 & 193 & 9 & \textbf{21.4$\times$} & 99 & 26 & 8 & 3.2$\times$ \\
+ScribeTokens (Ours) & 90 & 193 & 9 & \bfseries 21.4 $\times$ & 99 & 26 & 8 & 3.2 $\times$ \\
 \bottomrule
 \end{tabular}

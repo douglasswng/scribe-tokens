@@ -128,23 +128,48 @@ def format_repr_name(repr_name: str) -> str:
 def _format_dataset_cells(r, best_speedup: float | None) -> list[str]:
     """Format the 4 data cells (PT Ep., No PT, +PT, Spd.) for one dataset."""
     parts = []
-    parts.append(str(int(r["pt_epochs"])) if pd.notna(r["pt_epochs"]) else "--")
+    parts.append(str(int(r["pt_epochs"])) if pd.notna(r["pt_epochs"]) else "{--}")
     parts.append(str(int(r["base_conv"])))
 
     if pd.notna(r["match_epoch"]):
         parts.append(str(int(r["match_epoch"])))
     else:
-        parts.append("--")
+        parts.append("{--}")
 
     if pd.notna(r["speedup"]):
-        speedup_str = f"{r['speedup']:.1f}$\\times$"
+        speedup_str = f"{r['speedup']:.1f} $\\times$"
         if best_speedup is not None and abs(r["speedup"] - best_speedup) < 1e-9:
-            speedup_str = f"\\textbf{{{speedup_str}}}"
+            speedup_str = f"\\bfseries {speedup_str}"
         parts.append(speedup_str)
     else:
-        parts.append("--")
+        parts.append("{--}")
 
     return parts
+
+
+def _compute_col_specs(task_summary: pd.DataFrame) -> list[str]:
+    """Compute siunitx S column format strings for each dataset's 4 columns."""
+    specs = []
+    for dataset in DATASET_ORDER:
+        subset = cast(pd.DataFrame, task_summary[task_summary["dataset"] == dataset])
+
+        pt_vals = [int(v) for v in subset["pt_epochs"].dropna()]
+        max_val = max(pt_vals) if pt_vals else 99
+        specs.append(f"S[table-format={len(str(max_val))}]")
+
+        base_vals = [int(v) for v in subset["base_conv"].dropna()]
+        max_val = max(base_vals) if base_vals else 99
+        specs.append(f"S[table-format={len(str(max_val))}]")
+
+        match_vals = [int(v) for v in subset["match_epoch"].dropna()]
+        max_val = max(match_vals) if match_vals else 9
+        specs.append(f"S[table-format={len(str(max_val))}]")
+
+        spd_vals = list(subset["speedup"].dropna())
+        int_digits = len(str(int(max(spd_vals)))) if spd_vals else 1
+        specs.append(f"S[table-format={int_digits}.1, table-space-text-post=$\\times$]")
+
+    return specs
 
 
 def to_latex(task_summary: pd.DataFrame) -> str:
@@ -163,10 +188,13 @@ def to_latex(task_summary: pd.DataFrame) -> str:
         valid = subset["speedup"].dropna()
         best_speedup[dataset] = valid.max() if not valid.empty else None
 
-    n_datasets = len(DATASET_ORDER)
-    col_spec = "l" + " cccc" * n_datasets
+    col_specs = _compute_col_specs(task_summary)
+    indent = "  "
+    col_spec_str = "l\n" + "\n".join(
+        indent + " ".join(col_specs[i : i + 4]) for i in range(0, len(col_specs), 4)
+    )
     lines: list[str] = []
-    lines.append(f"\\begin{{tabular}}{{{col_spec}}}")
+    lines.append(f"\\begin{{tabular}}{{{col_spec_str}}}")
     lines.append("\\toprule")
 
     # Multicolumn dataset header
@@ -176,6 +204,7 @@ def to_latex(task_summary: pd.DataFrame) -> str:
     lines.append(" & ".join(mc_parts) + " \\\\")
 
     # cmidrules
+    n_datasets = len(DATASET_ORDER)
     rules = []
     for idx in range(n_datasets):
         start = 2 + idx * 4
@@ -183,10 +212,10 @@ def to_latex(task_summary: pd.DataFrame) -> str:
         rules.append(f"\\cmidrule(lr){{{start}-{end}}}")
     lines.append(" ".join(rules))
 
-    # Sub-header
+    # Sub-header — wrap column names in {} for siunitx S columns
     sub = ["Method"]
     for _ in DATASET_ORDER:
-        sub.extend(["PT Ep.", "No PT", "+PT", "Spd."])
+        sub.extend(["{PT Ep.}", "{No PT}", "{+PT}", "{Spd.}"])
     lines.append(" & ".join(sub) + " \\\\")
     lines.append("\\midrule")
 
@@ -196,7 +225,7 @@ def to_latex(task_summary: pd.DataFrame) -> str:
             subset = cast(pd.DataFrame, task_summary[task_summary["dataset"] == dataset])
             row = cast(pd.DataFrame, subset[subset["repr"] == repr_name])
             if row.empty:
-                parts.extend(["--"] * 4)
+                parts.extend(["{--}"] * 4)
             else:
                 parts.extend(_format_dataset_cells(row.iloc[0], best_speedup[dataset]))
 

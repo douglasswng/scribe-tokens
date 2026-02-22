@@ -1,19 +1,23 @@
-\begin{tabular}{llcccc}
+\begin{tabular}{ll
+  S[table-format=2.2, table-space-text-post={\,{\scriptsize\textcolor{red}{(+00.00)}}}]
+  S[table-format=2.2, table-space-text-post={\,{\scriptsize\textcolor{red}{(+00.00)}}}]
+  S[table-format=2.2, table-space-text-post={\,{\scriptsize\textcolor{red}{(+00.00)}}}]
+  S[table-format=2.2, table-space-text-post={\,{\scriptsize\textcolor{red}{(+00.00)}}}]}
 \toprule
  &  & \multicolumn{2}{c}{IAM} & \multicolumn{2}{c}{DeepWriting} \\
 \cmidrule(lr){3-4} \cmidrule(lr){5-6}
-Method &  & CER (\%) $\downarrow$ & Acc (\%) $\uparrow$ & CER (\%) $\downarrow$ & Acc (\%) $\uparrow$ \\
+Method &  & {CER (\%) $\downarrow$} & {Acc (\%) $\uparrow$} & {CER (\%) $\downarrow$} & {Acc (\%) $\uparrow$} \\
 \midrule
 Point-5 &  & 9.43 & 31.38 & 10.94 & 81.97 \\
- & +PT & 13.63 {\scriptsize\textcolor{red}{(+4.19)}} & 18.92 {\scriptsize\textcolor{red}{(-12.45)}} & 10.25 {\scriptsize\textcolor{teal}{(-0.69)}} & 83.16 {\scriptsize\textcolor{teal}{(+1.19)}} \\
+ & +PT & 13.63\,{\scriptsize\textcolor{red}{(+4.19)}} & 18.92\,{\scriptsize\textcolor{red}{(-12.45)}} & 10.25\,{\scriptsize\textcolor{teal}{(-0.69)}} & 83.16\,{\scriptsize\textcolor{teal}{(+1.19)}} \\
 \addlinespace
 RelTokens &  & 12.69 & 25.11 & 11.22 & 81.60 \\
- & +PT & 9.16 {\scriptsize\textcolor{teal}{(-3.53)}} & 30.75 {\scriptsize\textcolor{teal}{(+5.65)}} & 10.49 {\scriptsize\textcolor{teal}{(-0.73)}} & 82.73 {\scriptsize\textcolor{teal}{(+1.13)}} \\
+ & +PT & 9.16\,{\scriptsize\textcolor{teal}{(-3.53)}} & 30.75\,{\scriptsize\textcolor{teal}{(+5.65)}} & 10.49\,{\scriptsize\textcolor{teal}{(-0.73)}} & 82.73\,{\scriptsize\textcolor{teal}{(+1.13)}} \\
 \addlinespace
 TextTokens &  & 82.00 & 0.00 & 11.65 & 81.17 \\
- & +PT & 9.54 {\scriptsize\textcolor{teal}{(-72.46)}} & 29.57 {\scriptsize\textcolor{teal}{(+29.57)}} & 10.07 {\scriptsize\textcolor{teal}{(-1.58)}} & 83.33 {\scriptsize\textcolor{teal}{(+2.17)}} \\
+ & +PT & 9.54\,{\scriptsize\textcolor{teal}{(-72.46)}} & 29.57\,{\scriptsize\textcolor{teal}{(+29.57)}} & 10.07\,{\scriptsize\textcolor{teal}{(-1.58)}} & 83.33\,{\scriptsize\textcolor{teal}{(+2.17)}} \\
 \midrule
 ScribeTokens (Ours) &  & 13.15 & 22.79 & 10.75 & 82.29 \\
- & +PT & \textbf{8.27} {\scriptsize\textcolor{teal}{(-4.87)}} & \textbf{32.93} {\scriptsize\textcolor{teal}{(+10.14)}} & \textbf{9.83} {\scriptsize\textcolor{teal}{(-0.92)}} & \textbf{83.40} {\scriptsize\textcolor{teal}{(+1.11)}} \\
+ & +PT & \bfseries 8.27 \mdseries\,{\scriptsize\textcolor{teal}{(-4.87)}} & \bfseries 32.93 \mdseries\,{\scriptsize\textcolor{teal}{(+10.14)}} & \bfseries 9.83 \mdseries\,{\scriptsize\textcolor{teal}{(-0.92)}} & \bfseries 83.40 \mdseries\,{\scriptsize\textcolor{teal}{(+1.11)}} \\
 \bottomrule
 \end{tabular}

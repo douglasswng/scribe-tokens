@@ -49,8 +49,16 @@ def format_value(value: float, metric: str, is_best: bool) -> str:
     fmt = METRIC_CONFIG[metric][1]
     formatted = f"{value * scale:{fmt}}"
     if is_best:
-        return f"\\textbf{{{formatted}}}"
+        return f"\\bfseries {formatted} \\mdseries"
     return formatted
+
+
+def _metric_col_spec() -> str:
+    """Return siunitx S column spec for a metric that may have a +PT delta annotation."""
+    return (
+        r"S[table-format=2.2, table-space-text-post="
+        r"{\,{\scriptsize\textcolor{red}{(+00.00)}}}]"
+    )
 
 
 def format_delta(delta: float, metric: str) -> str:
@@ -66,7 +74,7 @@ def format_delta(delta: float, metric: str) -> str:
     is_improvement = (higher_is_better and delta > 0) or (not higher_is_better and delta < 0)
     color = "teal" if is_improvement else "red"
 
-    return f"{{\\scriptsize\\textcolor{{{color}}}{{({formatted})}}}}"
+    return f"\\,{{\\scriptsize\\textcolor{{{color}}}{{({formatted})}}}}"
 
 
 def is_our_method(repr_name: str) -> bool:
@@ -120,10 +128,11 @@ def csv_to_latex(csv_path: Path, output_path: Path) -> str:
     # Build LaTeX tabular
     lines = []
 
-    # Column spec: method + training + (metrics per dataset)
-    num_data_cols = len(datasets) * len(metrics)
-    col_spec = "ll" + "c" * num_data_cols
-    lines.append(f"\\begin{{tabular}}{{{col_spec}}}")
+    # Column spec: method + training + S columns for each metric per dataset
+    indent = "  "
+    s_specs = [_metric_col_spec() for _ in datasets for _ in metrics]
+    col_spec_str = "ll\n" + "\n".join(indent + spec for spec in s_specs)
+    lines.append(f"\\begin{{tabular}}{{{col_spec_str}}}")
     lines.append("\\toprule")
 
     # Header row 1: Dataset names spanning metrics
@@ -142,11 +151,11 @@ def csv_to_latex(csv_path: Path, output_path: Path) -> str:
         col_idx = end_col + 1
     lines.append(" ".join(cmidrules))
 
-    # Header row 2: Metric names
+    # Header row 2: Metric names — wrap in {} for siunitx S columns
     header2_parts = ["Method", ""]
     for _ in datasets:
         for metric in metrics:
-            header2_parts.append(METRIC_CONFIG[metric][2])
+            header2_parts.append("{" + METRIC_CONFIG[metric][2] + "}")
     lines.append(" & ".join(header2_parts) + " \\\\")
     lines.append("\\midrule")
 
@@ -213,7 +222,7 @@ def csv_to_latex(csv_path: Path, output_path: Path) -> str:
                             bkey = (repr_name, dataset, metric)
                             if bkey in baseline_values:
                                 delta = value - baseline_values[bkey]
-                                cell += " " + format_delta(delta, metric)
+                                cell += format_delta(delta, metric)
 
                         row_parts.append(cell)
 

@@ -678,10 +678,60 @@ def _draw_completion_prefix(
         display,
         ha="left",
         va="center",
-        fontsize=10,
+        fontsize=8,
         fontfamily="monospace",
         color="black",
     )
+
+
+# ── Figure layout ─────────────────────────────────────────────────────────────
+_TARGET_WIDTH = 3.4  # inches; 0.618 × NeurIPS \textwidth
+_ROW_HEIGHT = 0.26  # inches per row; controls ink legibility
+_LEFT_IN = 0.05
+_RIGHT_IN = 0.05
+_TOP_IN = 0.25  # space for column titles
+_BOTTOM_IN = 0.05
+_HSPACE = 0.01
+_FONT_PT = 8  # must match font.size rcParam
+_MONO_ASPECT = 0.6  # monospace character width-to-height ratio
+_TEXT_PAD = 1.15  # 15% padding around text column widths
+
+
+def _compute_layout(
+    x_min: float,
+    x_max: float,
+    y_min: float,
+    y_max: float,
+    x_pad: float,
+    y_pad: float,
+    n_rows: int,
+    text: str,
+) -> tuple[float, float, float, float, float, float]:
+    """Compute figure dimensions and column widths from _FIG_WIDTH and _ROW_HEIGHT.
+
+    Returns: fig_width, fig_height, completion_col_in, char_col_in, ink_col_in.
+
+    _ROW_HEIGHT drives ink legibility: ink_col_in = row_height × ink_aspect so
+    that aspect='equal' is satisfied at 1:1 scale. Text columns are sized from
+    their content. Completion gets whatever subplot width remains.
+    """
+    char_w = _FONT_PT * _MONO_ASPECT / 72  # inches per monospace character
+
+    ink_aspect = (x_max - x_min + 2 * x_pad) / max(y_max - y_min + 2 * y_pad, 1e-6)
+    ink_col_in = _ROW_HEIGHT * ink_aspect
+
+    # Target column: widest possible token is EOS_TOKEN ("</s>", 5 chars)
+    char_col_in = max(len(EOS_TOKEN), len(SPACE_TOKEN)) * char_w * _TEXT_PAD
+
+    # Prefix column: BOS + full text is the maximum content width
+    completion_col_in = (len(BOS_TOKEN) + len(text)) * char_w * _TEXT_PAD
+
+    content_width = _LEFT_IN + _RIGHT_IN + completion_col_in + char_col_in + ink_col_in
+    spacer_col_in = max(0.0, _TARGET_WIDTH - content_width)
+
+    fig_width = max(content_width, _TARGET_WIDTH)
+    fig_height = _ROW_HEIGHT * n_rows + _TOP_IN + _BOTTOM_IN
+    return fig_width, fig_height, completion_col_in, char_col_in, spacer_col_in, ink_col_in
 
 
 def save_table(
@@ -709,8 +759,8 @@ def save_table(
     all_pts = np.concatenate([s for s in strokes if len(s) > 0])
     x_min, y_min = all_pts.min(axis=0)
     x_max, y_max = all_pts.max(axis=0)
-    x_pad = (x_max - x_min) * 0.05 + 1
-    y_pad = (y_max - y_min) * 0.05 + 1
+    x_pad = (x_max - x_min) * 0.05
+    y_pad = (y_max - y_min) * 0.05
 
     # Precompute segments and single-point strokes
     all_segs_arr, stroke_seg_ranges = _build_segments_and_ranges(strokes)
@@ -735,39 +785,38 @@ def save_table(
     distributions = normalized_distributions
     clim_max = 1.0
 
-    # Layout: derive column widths from content
-    row_height = 0.3
-    ink_aspect = (x_max - x_min + 2 * x_pad) / max(y_max - y_min + 2 * y_pad, 1e-6)
-    ink_width = row_height * ink_aspect
-    ink_width = max(3.0, min(8.0, ink_width))  # clamp to reasonable range
-    target_char_width = 0.5
-    completion_chars = len(BOS_TOKEN) + max(len(text), 1)
-    completion_width = max(2.0, min(6.0, 0.12 * completion_chars))
-    fig_width = completion_width + target_char_width + ink_width
-    fig_height = row_height * n_rows
+    # Layout: _ROW_HEIGHT drives ink size; extra space becomes a spacer between Target and Ink
+    fig_width, fig_height, completion_width, target_char_width, spacer_width, ink_width = (
+        _compute_layout(x_min, x_max, y_min, y_max, x_pad, y_pad, n_rows, text)
+    )
 
     fig = plt.figure(figsize=(fig_width, fig_height))
     gs = fig.add_gridspec(
         n_rows,
-        3,
-        width_ratios=[completion_width, target_char_width, ink_width],
-        hspace=0.01,
+        4,
+        width_ratios=[completion_width, target_char_width, spacer_width, ink_width],
+        hspace=_HSPACE,
         wspace=0,
+        left=_LEFT_IN / fig_width,
+        right=1 - _RIGHT_IN / fig_width,
+        top=1 - _TOP_IN / fig_height,
+        bottom=_BOTTOM_IN / fig_height,
     )
-    axes = np.empty((n_rows, 3), dtype=object)
+    axes = np.empty((n_rows, 4), dtype=object)
     for r in range(n_rows):
-        for c in range(3):
+        for c in range(4):
             axes[r, c] = fig.add_subplot(gs[r, c])
 
     for row in range(n_rows):
         ax_completion = axes[row, 0]
         ax_char = axes[row, 1]
-        ax_ink = axes[row, 2]
+        axes[row, 2].set_visible(False)  # spacer between Target and Ink
+        ax_ink = axes[row, 3]
 
         if row == 0:
-            ax_completion.set_title("Prefix", fontsize=10, pad=6)
-            ax_char.set_title("Target", fontsize=10, pad=6)
-            ax_ink.set_title("Ink Attention", fontsize=10, pad=6)
+            ax_completion.set_title("Prefix", fontsize=8, pad=6)
+            ax_char.set_title("Target", fontsize=8, pad=6)
+            ax_ink.set_title("Ink Attention", fontsize=8, pad=6)
 
         # Completion prefix
         completion = text[: min(row, len(text))]
@@ -788,7 +837,7 @@ def save_table(
             char,
             ha="center",
             va="center",
-            fontsize=10,
+            fontsize=8,
             fontfamily="monospace",
             transform=ax_char.transAxes,
         )
@@ -841,7 +890,7 @@ def save_table(
                 edgecolors="none",
             )
 
-    fig.savefig(output_path, bbox_inches="tight", dpi=300)
+    fig.savefig(output_path, dpi=300)
     plt.close(fig)
     print(f"  Saved {output_path}")
 

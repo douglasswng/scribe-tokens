@@ -50,7 +50,7 @@ def main() -> None:
         }
     )
 
-    fig, ax = plt.subplots(figsize=(3.25, 2.0))
+    fig, ax = plt.subplots(figsize=(3.4, 2.1), layout="constrained")
 
     for repr_name, (label, colour) in REPR_STYLE.items():
         subset = cast(pd.DataFrame, df[df["repr"] == repr_name]).sort_values("epoch")
@@ -64,14 +64,14 @@ def main() -> None:
             linewidth=1.5,
         )
 
-    ax.set_xlabel("Epoch", fontsize=9)
-    ax.set_ylabel("Validation Cross-Entropy Loss", fontsize=9)
+    ax.set_xlabel("Epoch", fontsize=8)
+    ax.set_ylabel("Validation Cross-Entropy Loss", fontsize=8)
     ax.legend(frameon=False, fontsize=8)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUTPUT_PATH, bbox_inches="tight", dpi=300)
+    fig.savefig(OUTPUT_PATH, dpi=300)
     print(f"Saved {OUTPUT_PATH}")
     plt.close(fig)
 

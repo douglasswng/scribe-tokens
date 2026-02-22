@@ -16,6 +16,15 @@ from schemas.ink import DigitalInk, Point, Stroke
 SAMPLE_PATH = "data/iam/parsed/a01-007z-07.json"
 OUTPUT_PATH = FIGURES_DIR / "discretization.pdf"
 
+# ── Figure layout ─────────────────────────────────────────────────────────────
+_FIG_WIDTH = 4.4
+_LEFT_IN = 0.75   # space for rotated delta ylabel labels (labelpad=30pt + text)
+_RIGHT_IN = 0.05
+_TOP_IN = 0.25    # space for column titles
+_BOTTOM_IN = 0.05
+_HSPACE = 0.01
+_WSPACE = 0.0
+
 
 def load_ink_from_json(path: str) -> DigitalInk:
     """Load an IAM ink JSON file into a DigitalInk object."""
@@ -62,6 +71,20 @@ def plot_ink(ax: Axes, ink: DigitalInk) -> None:
             ax.plot(xs, ys, "-k", linewidth=1.0)
 
 
+def _compute_figsize(ink: DigitalInk, nrows: int, ncols: int = 2) -> tuple[float, float]:
+    """Derive figure height so each subplot renders ink at its native aspect ratio."""
+    xmin, xmax, ymin, ymax = get_bounding_box(ink)
+    x_pad = (xmax - xmin) * 0.05
+    y_pad = (ymax - ymin) * 0.05
+    ink_aspect = (xmax - xmin + 2 * x_pad) / max(ymax - ymin + 2 * y_pad, 1e-6)
+    subplot_region_width = _FIG_WIDTH - _LEFT_IN - _RIGHT_IN
+    col_width = subplot_region_width / ncols  # wspace=0, equal columns
+    row_height = col_width / ink_aspect
+    subplot_region_height = row_height * (nrows + (nrows - 1) * _HSPACE)
+    fig_height = subplot_region_height + _TOP_IN + _BOTTOM_IN
+    return _FIG_WIDTH, fig_height
+
+
 def main() -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -79,11 +102,15 @@ def main() -> None:
         }
     )
 
-    fig, axes = plt.subplots(
-        nrows,
-        ncols,
-        figsize=(5.5, 3.6),
-        gridspec_kw={"hspace": 0.01, "wspace": 0},
+    figsize = _compute_figsize(ink, nrows, ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    fig.subplots_adjust(
+        left=_LEFT_IN / figsize[0],
+        right=1 - _RIGHT_IN / figsize[0],
+        top=1 - _TOP_IN / figsize[1],
+        bottom=_BOTTOM_IN / figsize[1],
+        hspace=_HSPACE,
+        wspace=_WSPACE,
     )
 
     # Bounding box from the original ink for consistent limits
@@ -92,8 +119,8 @@ def main() -> None:
     y_pad = (ymax - ymin) * 0.05
 
     # Column titles
-    axes[0, 0].set_title("Quantized", fontsize=10)
-    axes[0, 1].set_title("Postprocessed", fontsize=10)
+    axes[0, 0].set_title("Quantized", fontsize=8)
+    axes[0, 1].set_title("Postprocessed", fontsize=8)
 
     for row_idx, delta in enumerate(deltas):
         # Left column: raw quantized
@@ -122,7 +149,7 @@ def main() -> None:
         if delta == 8:
             axes[row_idx, 0].set_ylabel(
                 label,
-                fontsize=9,
+                fontsize=8,
                 fontweight="bold",
                 color="#2e7d32",
                 rotation=0,
@@ -132,13 +159,13 @@ def main() -> None:
         else:
             axes[row_idx, 0].set_ylabel(
                 label,
-                fontsize=9,
+                fontsize=8,
                 rotation=0,
                 labelpad=30,
                 va="center",
             )
 
-    fig.savefig(OUTPUT_PATH, bbox_inches="tight", dpi=300)
+    fig.savefig(OUTPUT_PATH, dpi=300)
     print(f"Saved {OUTPUT_PATH}")
     plt.close(fig)
 

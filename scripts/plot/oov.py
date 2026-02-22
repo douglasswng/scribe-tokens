@@ -65,7 +65,7 @@ def _plot_tokeniser_data(
             linewidth=1.5,
         )
     suffix = " (Ours)" if tokeniser_type == OURS else ""
-    ax.set_title(f"{tokeniser_type}{suffix}", fontsize=10)
+    ax.set_title(f"{tokeniser_type}{suffix}", fontsize=8)
     ax.grid(True, alpha=0.2)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -78,8 +78,8 @@ def _finalize_plot_layout(fig: Figure, axes: list, n_tokenisers: int) -> None:
     for i in range(n_tokenisers, len(axes)):
         axes[i].set_visible(False)
 
-    fig.supxlabel("Vocabulary Size (k)", fontsize=9)
-    fig.supylabel("OOV Rate (%)", fontsize=9)
+    fig.supxlabel("Vocabulary Size (k)", fontsize=8)
+    fig.supylabel("OOV Rate (%)", fontsize=8)
 
 
 def create_oov_plot(df: pd.DataFrame, figsize: tuple[float, float] = (5.5, 1.8)) -> Figure:
@@ -113,7 +113,7 @@ def create_oov_plot(df: pd.DataFrame, figsize: tuple[float, float] = (5.5, 1.8))
 
 def save_figure(fig: Figure, output_path: Path = FIGURE_PATH) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=300)
+    fig.savefig(output_path, dpi=300, bbox_inches=None)
 
 
 def plot(

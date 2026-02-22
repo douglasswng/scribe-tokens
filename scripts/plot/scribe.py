@@ -42,6 +42,12 @@ _MIN_STEPS = 4                 # minimum path positions required for zoom token
 # ── Rendering ─────────────────────────────────────────────────────────────────
 ARROW_SHRINK_FRAC = 0.0        # fraction of segment to leave clear before arrowhead
 
+# ── Figure layout ─────────────────────────────────────────────────────────────
+_FIG_WIDTH = 5.5               # inches; matches NeurIPS \textwidth
+_GS_LEFT, _GS_RIGHT = 0.01, 0.99
+_GS_TOP, _GS_BOTTOM = 0.95, 0.05
+_GS_WSPACE = 0.12
+
 # ── Annotation styling ────────────────────────────────────────────────────────
 _ANNOT_COLOR = "black"
 _ANNOT_LINEWIDTH = 1.0
@@ -359,6 +365,32 @@ def _draw_zoom_panel(
         ))
 
 
+def _compute_figsize(
+    all_x: list[int],
+    all_y: list[int],
+    width_ratios: list[int],
+) -> tuple[float, float]:
+    """Derive figure height so the main axis renders at the ink's native aspect ratio.
+
+    Given fixed GridSpec parameters and a target figure width, the main axis
+    width is determined analytically. The height is then chosen so that
+    aspect='equal' on that axis displays the ink without distortion.
+    """
+    ink_aspect = (max(all_x) - min(all_x)) / max(max(all_y) - min(all_y), 1e-6)
+
+    subplot_width = _FIG_WIDTH * (_GS_RIGHT - _GS_LEFT)
+    n_cols = len(width_ratios)
+    sum_ratios = sum(width_ratios)
+    avg_ratio = sum_ratios / n_cols
+    # subplot_width = unit * (sum_ratios + (n_cols-1) * wspace * avg_ratio)
+    unit = subplot_width / (sum_ratios + (n_cols - 1) * _GS_WSPACE * avg_ratio)
+    main_ax_width = max(width_ratios) * unit
+
+    main_ax_height = main_ax_width / ink_aspect
+    fig_height = main_ax_height / (_GS_TOP - _GS_BOTTOM)
+    return _FIG_WIDTH, fig_height
+
+
 def main() -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -399,18 +431,19 @@ def main() -> None:
     )
 
     # ── Layout: [zoom] [main] or [main] [zoom] ────────────────────────────────
-    fig = plt.figure(figsize=(7.0, 2.2))
     width_ratios = [1, 5] if zoom_on_left else [5, 1]
+    figsize = _compute_figsize(all_x, all_y, width_ratios)
+    fig = plt.figure(figsize=figsize)
     gs = GridSpec(
         1,
         2,
         figure=fig,
         width_ratios=width_ratios,
-        wspace=0.12,
-        left=0.01,
-        right=0.99,
-        top=0.80,
-        bottom=0.04,
+        wspace=_GS_WSPACE,
+        left=_GS_LEFT,
+        right=_GS_RIGHT,
+        top=_GS_TOP,
+        bottom=_GS_BOTTOM,
     )
     if zoom_on_left:
         ax_zoom = fig.add_subplot(gs[0])
@@ -447,7 +480,7 @@ def main() -> None:
         connect_side=connect_side,
     )
 
-    fig.savefig(OUTPUT_PATH, bbox_inches="tight", dpi=300)
+    fig.savefig(OUTPUT_PATH, dpi=300)
     print(f"Saved {OUTPUT_PATH}")
     plt.close(fig)
 

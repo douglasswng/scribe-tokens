@@ -48,7 +48,7 @@ INK_LINE_WIDTH = 0.7
 DOT_MARKER_SIZE = 1.0
 LINE_CAPSTYLE = "projecting"
 LINE_JOINSTYLE = "round"
-SMOOTH_STROKES = True
+SMOOTH_STROKES = False
 
 
 class AttentionCapture:

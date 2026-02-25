@@ -25,7 +25,7 @@ preprocess-iam: parse-iam
 preprocess-deepwriting: parse-deepwriting split-deepwriting
 
 # --- Tokenizer ---
-train-tokenisers:
+train-tokenizers:
 	$(PYTHON) -m scripts.train.tokenisers
 
 eval-compression:
@@ -34,7 +34,7 @@ eval-compression:
 eval-oov:
 	$(PYTHON) -m scripts.eval.oov
 
-tokeniser-eval: eval-compression eval-oov
+eval-tokenizers: eval-compression eval-oov
 
 # --- Training ---
 train:
@@ -66,6 +66,7 @@ plot:
 	$(PYTHON) -m scripts.plot.convergence
 	$(PYTHON) -m scripts.plot.results
 	$(PYTHON) -m scripts.plot.scribe
+	$(PYTHON) -m scripts.plot.htg
 
 plot-compression:
 	$(PYTHON) -m scripts.plot.compression
@@ -90,6 +91,9 @@ plot-results:
 
 plot-scribe:
 	$(PYTHON) -m scripts.plot.scribe
+
+plot-htg:
+	$(PYTHON) -m scripts.plot.htg
 
 # --- Utilities ---
 move-checkpoints:

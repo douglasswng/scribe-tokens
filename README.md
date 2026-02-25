@@ -2,7 +2,7 @@
 
 Implementation and experiment pipeline for **ScribeTokens**, the digital-ink tokenization proposed in the paper.
 
-📄 [Paper (PDF)](docs/paper.pdf)
+📄 [Paper](docs/paper.pdf) | 📦 [Library (tokink)](https://github.com/douglasswng/tokink)
 
 ScribeTokens represents pen trajectories with a fixed base vocabulary of 10 tokens:
 - 8 directional unit-step tokens (Freeman-style chain directions)
@@ -157,10 +157,10 @@ make <target>
 | `preprocess-iam` | `parse-iam` (splits are generated during parsing) |
 | `preprocess-deepwriting` | `parse-deepwriting` then `split-deepwriting` |
 | **Tokenizer** | |
-| `train-tokenisers` | Train tokenizer families (delta/vocab sweep) |
+| `train-tokenizers` | Train tokenizer families (delta/vocab sweep) |
 | `eval-compression` | Evaluate tokenizer compression metrics |
 | `eval-oov` | Evaluate tokenizer OOV metrics |
-| `tokeniser-eval` | Runs `eval-compression` and `eval-oov` |
+| `eval-tokenizers` | Runs `eval-compression` and `eval-oov` |
 | **Training** | |
 | `train` | Train all default model/task combinations |
 | `train-test` | Quick test run (`--all --test`) |
@@ -179,6 +179,7 @@ make <target>
 | `plot-convergence` | Convergence speedup table only |
 | `plot-results` | Result CSV to LaTeX tables only |
 | `plot-scribe` | Scribe token visualization figure only |
+| `plot-htg` | HTG handwriting sample grid figure only |
 | **Utilities** | |
 | `move-checkpoints` | Move best checkpoint weights into `models/` |
 | `fetch-metrics` | Fetch SwanLab run metrics to CSV |
@@ -217,10 +218,10 @@ See [Data Setup](#data-setup) for expected raw directory layouts.
 
 ```bash
 # 1) train tokenizer families (delta/vocab sweep)
-make train-tokenisers
+make train-tokenizers
 
 # 2) evaluate tokenizer quality metrics
-make tokeniser-eval
+make eval-tokenizers
 
 # 3) plot tokenizer metrics
 make plot-compression
@@ -291,6 +292,7 @@ make plot-attention
 make plot-convergence
 make plot-results
 make plot-scribe
+make plot-htg
 
 # Results table for one task
 uv run -m scripts.plot.results --task HTR
@@ -312,8 +314,8 @@ make fetch-compute-time     # print total compute time from SwanLab runs
 # set DATASET="iam" in src/constants.py
 
 make preprocess-iam
-make train-tokenisers
-make tokeniser-eval
+make train-tokenizers
+make eval-tokenizers
 make train
 make eval
 make plot
@@ -325,8 +327,8 @@ make plot
 # set DATASET="deepwriting" in src/constants.py
 
 make preprocess-deepwriting
-make train-tokenisers
-make tokeniser-eval
+make train-tokenizers
+make eval-tokenizers
 make train
 make eval
 make plot

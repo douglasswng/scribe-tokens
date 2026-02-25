@@ -17,10 +17,10 @@ SAMPLE_PATH = "data/iam/parsed/a01-007z-07.json"
 OUTPUT_PATH = FIGURES_DIR / "discretization.pdf"
 
 # ── Figure layout ─────────────────────────────────────────────────────────────
-_FIG_WIDTH = 4.4
-_LEFT_IN = 0.75   # space for rotated delta ylabel labels (labelpad=30pt + text)
+_FIG_WIDTH = 5.5
+_LEFT_IN = 0.75  # space for rotated delta ylabel labels (labelpad=30pt + text)
 _RIGHT_IN = 0.05
-_TOP_IN = 0.25    # space for column titles
+_TOP_IN = 0.25  # space for column titles
 _BOTTOM_IN = 0.05
 _HSPACE = 0.01
 _WSPACE = 0.0

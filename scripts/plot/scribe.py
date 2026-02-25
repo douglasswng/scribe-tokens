@@ -46,11 +46,11 @@ ARROW_SHRINK_FRAC = 0.0        # fraction of segment to leave clear before arrow
 _FIG_WIDTH = 5.5               # inches; matches NeurIPS \textwidth
 _GS_LEFT, _GS_RIGHT = 0.01, 0.99
 _GS_TOP, _GS_BOTTOM = 0.95, 0.05
-_GS_WSPACE = 0.12
+_GS_WSPACE = 0.02
 
 # ── Annotation styling ────────────────────────────────────────────────────────
 _ANNOT_COLOR = "black"
-_ANNOT_LINEWIDTH = 1.0
+_ANNOT_LINEWIDTH = 0.7
 _CONNECTOR_COLOR = "0.5"
 _CONNECTOR_LINEWIDTH = 0.5
 
@@ -324,7 +324,7 @@ def _draw_zoom_panel(
     # ── Zoom panel: same rendering as main view ───────────────────────────────
     draw_pixels(ax_zoom, down_pixels, palette, alpha=1.0, zorder=2)
     draw_pixels(ax_zoom, up_pixels, palette, alpha=0.1, zorder=1)
-    add_path_arrows(ax_zoom, zoom_path, color="black", linewidth=1.0, head_scale=7.0)
+    add_path_arrows(ax_zoom, zoom_path, color="black", linewidth=0.7, head_scale=5.0)
 
     ax_zoom.set_xlim(zx_min, zx_max)
     ax_zoom.set_ylim(zy_min, zy_max)
@@ -431,7 +431,7 @@ def main() -> None:
     )
 
     # ── Layout: [zoom] [main] or [main] [zoom] ────────────────────────────────
-    width_ratios = [1, 5] if zoom_on_left else [5, 1]
+    width_ratios = [1.5, 5] if zoom_on_left else [5, 1.5]
     figsize = _compute_figsize(all_x, all_y, width_ratios)
     fig = plt.figure(figsize=figsize)
     gs = GridSpec(

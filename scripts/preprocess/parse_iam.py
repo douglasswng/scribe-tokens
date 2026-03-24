@@ -57,22 +57,34 @@ def element_to_strokes(element: ET.Element) -> list[list[tuple[int, int]]]:
 
 def parse_element(element: ET.Element) -> list[Parsed]:
     form_element = element.find(".//Form")
-    writer = form_element.get("writerID")  # type: ignore
+    if form_element is None:
+        print("Warning: <Form> element not found, skipping this document")
+        return []
+
+    writer = form_element.get("writerID") or "unknown"
     contents = []
     for content in element.findall(".//TextLine"):
         text = content.get("text")  # type: ignore
-        assert text is not None
+        if not text:
+            print(f"Warning: TextLine without text, skipping: {content.get('id')}")
+            continue
+
         text = html.unescape(text)
-        id = content.get("id")  # type: ignore
-        line_element = id_to_element(id)  # type: ignore
+        line_id = content.get("id")  # type: ignore
+        if not line_id:
+            print("Warning: TextLine without id, skipping")
+            continue
+
+        line_element = id_to_element(line_id)
         if line_element is None:
             continue
+
         strokes = element_to_strokes(line_element)
         contents.append(
             Parsed(
-                id=id,  # type: ignore
-                text=text,  # type: ignore
-                writer=writer,  # type: ignore
+                id=line_id,
+                text=text,
+                writer=writer,
                 ink=DigitalInk.from_coords(strokes),
             )
         )
